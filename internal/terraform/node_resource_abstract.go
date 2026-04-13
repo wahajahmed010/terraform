@@ -92,6 +92,13 @@ type NodeAbstractResource struct {
 	// tests to clean up any created infrastructure regardless of this setting
 	// in the configuration.
 	overridePreventDestroy bool
+
+	// actionTriggers records all triggers and their referenced actions. The
+	// Action nodes are referenced directly from the referencing trigger, so
+	// that the action nodes can be resolved to the correct provider in the
+	// graph, while allowing the triggering node to also connect to the same
+	// provider.
+	actiontriggers []*nodeAbstractActionTrigger
 }
 
 var (
@@ -109,6 +116,7 @@ var (
 	_ graphNodeAttachDataResourceDependsOn = (*NodeAbstractResource)(nil)
 	_ dag.GraphNodeDotter                  = (*NodeAbstractResource)(nil)
 	_ GraphNodeDestroyerCBD                = (*NodeAbstractResource)(nil)
+	_ GraphNodeActionProviderConsumer      = (*NodeAbstractResource)(nil)
 )
 
 // NewNodeAbstractResource creates an abstract resource graph node for
@@ -118,24 +126,6 @@ func NewNodeAbstractResource(addr addrs.ConfigResource) *NodeAbstractResource {
 		Addr: addr,
 	}
 }
-
-var (
-	_ GraphNodeModuleInstance            = (*NodeAbstractResourceInstance)(nil)
-	_ GraphNodeReferenceable             = (*NodeAbstractResourceInstance)(nil)
-	_ GraphNodeReferencer                = (*NodeAbstractResourceInstance)(nil)
-	_ GraphNodeProviderConsumer          = (*NodeAbstractResourceInstance)(nil)
-	_ GraphNodeProvisionerConsumer       = (*NodeAbstractResourceInstance)(nil)
-	_ GraphNodeConfigResource            = (*NodeAbstractResourceInstance)(nil)
-	_ GraphNodeResourceInstance          = (*NodeAbstractResourceInstance)(nil)
-	_ GraphNodeAttachResourceState       = (*NodeAbstractResourceInstance)(nil)
-	_ GraphNodeAttachResourceConfig      = (*NodeAbstractResourceInstance)(nil)
-	_ GraphNodeAttachResourceSchema      = (*NodeAbstractResourceInstance)(nil)
-	_ GraphNodeAttachProvisionerSchema   = (*NodeAbstractResourceInstance)(nil)
-	_ GraphNodeAttachProviderMetaConfigs = (*NodeAbstractResourceInstance)(nil)
-	_ GraphNodeTargetable                = (*NodeAbstractResourceInstance)(nil)
-	_ GraphNodeOverridable               = (*NodeAbstractResourceInstance)(nil)
-	_ dag.GraphNodeDotter                = (*NodeAbstractResourceInstance)(nil)
-)
 
 func (n *NodeAbstractResource) Name() string {
 	return n.ResourceAddr().String()
@@ -353,6 +343,21 @@ func (n *NodeAbstractResource) Provider() ProviderRef {
 			Module:   n.ModulePath(),
 		},
 	}
+}
+
+func (n *NodeAbstractResource) ActionProviders() []ProviderRef {
+	// actions are not stateful and only run directly from configuration, so we
+	// don't need all the dance around config vs state like in the main
+	// resource, and can just return th connected provider.
+
+	var res []ProviderRef
+	for _, trigger := range n.actiontriggers {
+		res = append(res, ProviderRef{
+			addr:     trigger.resolvedProvider,
+			resolved: true,
+		})
+	}
+	return res
 }
 
 // GraphNodeProvisionerConsumer

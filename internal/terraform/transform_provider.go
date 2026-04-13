@@ -69,10 +69,19 @@ type GraphNodeCloseProvider interface {
 type GraphNodeProviderConsumer interface {
 	GraphNodeModulePath
 	// Provider returns the provider requested by this resource.
-	Provider() (provider ProviderRef)
+	Provider() ProviderRef
 
 	// Set the resolved provider address for this resource.
 	SetProvider(addrs.AbsProviderConfig)
+}
+
+// GraphNodeActionProviderConsumer reports all providers required for any
+// actions bound to the implementing object. The actions themselves exist as
+// separate nodes for the process of provider resolution, and those nodes
+// implement GraphNodeProviderConsumer.
+type GraphNodeActionProviderConsumer interface {
+	GraphNodeModulePath
+	ActionProviders() []ProviderRef
 }
 
 // ProviderRef stores the current known provider status for a resource

@@ -82,6 +82,7 @@ func (t *ActionTriggerConfigTransformer) transformSingle(g *Graph, config *confi
 		priorBeforeNodes := []dag.Vertex{}
 		priorAfterNodes := []dag.Vertex{}
 		for i, at := range r.Managed.ActionTriggers {
+
 			containsBeforeEvent := false
 			containsAfterEvent := false
 			for _, event := range at.Events {

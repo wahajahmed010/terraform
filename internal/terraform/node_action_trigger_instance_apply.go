@@ -202,8 +202,8 @@ func (n *nodeActionTriggerApplyInstance) Execute(ctx EvalContext, wo walkOperati
 
 func (n *nodeActionTriggerApplyInstance) Provider() ProviderRef {
 	return ProviderRef{
-		addr:     n.ActionInvocation.ProviderAddr,
-		resolved: true,
+		Addr:     n.ActionInvocation.ProviderAddr,
+		Resolved: true,
 	}
 }
 

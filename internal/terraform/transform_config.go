@@ -132,35 +132,43 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 	// collect all the Action Declarations (configs.Actions) in this module so
 	// we can validate that actions referenced in a resource's ActionTriggers
 	// exist in this module.
-	allConfigActions := make(map[string]*configs.Action)
+	allConfigActions := make(map[string]*NodeActionConfig)
 	for _, a := range module.Actions {
 		if a != nil {
 			addr := a.Addr().InModule(path)
-			allConfigActions[addr.String()] = a
 			log.Printf("[TRACE] ConfigTransformer: Adding action %s", addr)
-			abstract := &NodeAbstractAction{
+			node := &NodeActionConfig{
 				Addr:   addr,
 				Config: *a,
 			}
-			var node dag.Vertex
-			if f := t.ConcreteAction; f != nil {
-				node = f(abstract)
-			} else {
-				node = DefaultConcreteActionNodeFunc(abstract)
-			}
+
+			// FIXME: all nodes should only be NodeActionConfig, with no expansion or execution.
+			// var node dag.Vertex
+			// if f := t.ConcreteAction; f != nil {
+			// 	node = f(abstract)
+			// } else {
+			// 	node = DefaultConcreteActionNodeFunc(abstract)
+			// }
 			g.Add(node)
+			allConfigActions[addr.String()] = node
 		}
 	}
 
 	for _, r := range allResources {
 		relAddr := r.Addr()
+		configAddr := relAddr.InModule(path)
 
+		abstract := &NodeAbstractResource{
+			Addr: configAddr,
+		}
 		// Verify that any actions referenced in the resource's ActionTriggers exist in this module
 		var diags tfdiags.Diagnostics
 		if r.Managed != nil && r.Managed.ActionTriggers != nil {
 			for _, at := range r.Managed.ActionTriggers {
+				triggerRef := &resourceActionTrigger{
+					config: at,
+				}
 				for _, action := range at.Actions {
-
 					refs, parseRefDiags := langrefs.ReferencesInExpr(addrs.ParseRef, action.Expr)
 					if parseRefDiags != nil {
 						return parseRefDiags.Err()
@@ -182,7 +190,7 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 						}
 					}
 
-					_, ok := allConfigActions[configAction.String()]
+					actionNode, ok := allConfigActions[configAction.String()]
 					if !ok {
 						suggestion := didyoumean.NameSuggestion(configAction.String(), slices.Collect(maps.Keys(allConfigActions)))
 						if suggestion != "" {
@@ -196,8 +204,11 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 							Subject:  action.Expr.Range().Ptr(),
 							Context:  r.DeclRange.Ptr(),
 						})
+						continue
 					}
+					triggerRef.actions = append(triggerRef.actions, actionNode)
 				}
+				abstract.actionTriggers = append(abstract.actionTriggers, triggerRef)
 			}
 		}
 		if diags.HasErrors() {
@@ -207,7 +218,6 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 		// If any of the import targets can apply to this node's instances,
 		// filter them down to the applicable addresses.
 		var imports []*ImportTarget
-		configAddr := relAddr.InModule(path)
 
 		var matchedIndices []int
 		for ix, i := range importTargets {
@@ -235,10 +245,7 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 			importTargets = append(importTargets[:tIx], importTargets[tIx+1:]...)
 		}
 
-		abstract := &NodeAbstractResource{
-			Addr:          configAddr,
-			importTargets: imports,
-		}
+		abstract.importTargets = imports
 
 		if r.List != nil {
 			abstract.generateConfigPath = t.generateConfigPathForImportTargets

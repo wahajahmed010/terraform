@@ -33,8 +33,8 @@ func (n *nodeActionInvokeExpand) Provider() ProviderRef {
 	// Once the provider is fully resolved, we can return the known value.
 	if n.resolvedProvider.Provider.Type != "" {
 		return ProviderRef{
-			addr:     n.resolvedProvider,
-			resolved: true,
+			Addr:     n.resolvedProvider,
+			Resolved: true,
 		}
 	}
 
@@ -44,7 +44,7 @@ func (n *nodeActionInvokeExpand) Provider() ProviderRef {
 		Module:   n.ModulePath(),
 	}
 
-	return ProviderRef{addr: addr}
+	return ProviderRef{Addr: addr}
 }
 
 func (n *nodeActionInvokeExpand) SetProvider(p addrs.AbsProviderConfig) {

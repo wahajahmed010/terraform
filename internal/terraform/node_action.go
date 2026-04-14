@@ -18,7 +18,7 @@ type GraphNodeConfigAction interface {
 // nodeExpandAction represents an action config block in a module, which has not
 // yet been expanded.
 type nodeExpandAction struct {
-	*NodeAbstractAction
+	*NodeActionConfig
 }
 
 var (

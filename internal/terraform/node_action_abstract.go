@@ -11,9 +11,10 @@ import (
 	"github.com/hashicorp/terraform/internal/providers"
 )
 
-// NodeAbstractAction represents an action that has no associated
-// operations.
-type NodeAbstractAction struct {
+// NodeActionConfig represents an action in the configuration. This node is
+// primarily concerned with resolving provider references and receiving the
+// correct schema. All expansion and execution is done from an action trigger.
+type NodeActionConfig struct {
 	Addr   addrs.ConfigAction
 	Config configs.Action
 
@@ -28,44 +29,44 @@ type NodeAbstractAction struct {
 }
 
 var (
-	_ GraphNodeReferenceable      = (*NodeAbstractAction)(nil)
-	_ GraphNodeReferencer         = (*NodeAbstractAction)(nil)
-	_ GraphNodeConfigAction       = (*NodeAbstractAction)(nil)
-	_ GraphNodeAttachActionSchema = (*NodeAbstractAction)(nil)
-	_ GraphNodeProviderConsumer   = (*NodeAbstractAction)(nil)
-	_ GraphNodeAttachDependencies = (*NodeAbstractAction)(nil)
+	_ GraphNodeReferenceable      = (*NodeActionConfig)(nil)
+	_ GraphNodeReferencer         = (*NodeActionConfig)(nil)
+	_ GraphNodeConfigAction       = (*NodeActionConfig)(nil)
+	_ GraphNodeAttachActionSchema = (*NodeActionConfig)(nil)
+	_ GraphNodeProviderConsumer   = (*NodeActionConfig)(nil)
+	_ GraphNodeAttachDependencies = (*NodeActionConfig)(nil)
 )
 
-func (n NodeAbstractAction) Name() string {
+func (n NodeActionConfig) Name() string {
 	return n.Addr.String()
 }
 
 // ConcreteActionNodeFunc is a callback type used to convert an
 // abstract action to a concrete one of some type.
-type ConcreteActionNodeFunc func(*NodeAbstractAction) dag.Vertex
+type ConcreteActionNodeFunc func(*NodeActionConfig) dag.Vertex
 
 // DefaultConcreteActionNodeFunc is the default ConcreteActionNodeFunc used by
 // everything except validate.
-func DefaultConcreteActionNodeFunc(a *NodeAbstractAction) dag.Vertex {
+func DefaultConcreteActionNodeFunc(a *NodeActionConfig) dag.Vertex {
 	return &nodeExpandAction{
-		NodeAbstractAction: a,
+		NodeActionConfig: a,
 	}
 }
 
 // GraphNodeConfigAction
-func (n NodeAbstractAction) ActionAddr() addrs.ConfigAction {
+func (n NodeActionConfig) ActionAddr() addrs.ConfigAction {
 	return n.Addr
 }
 
-func (n NodeAbstractAction) ModulePath() addrs.Module {
+func (n NodeActionConfig) ModulePath() addrs.Module {
 	return n.Addr.Module
 }
 
-func (n *NodeAbstractAction) ReferenceableAddrs() []addrs.Referenceable {
+func (n *NodeActionConfig) ReferenceableAddrs() []addrs.Referenceable {
 	return []addrs.Referenceable{n.Addr.Action}
 }
 
-func (n *NodeAbstractAction) References() []*addrs.Reference {
+func (n *NodeActionConfig) References() []*addrs.Reference {
 	var result []*addrs.Reference
 	c := n.Config
 
@@ -82,16 +83,16 @@ func (n *NodeAbstractAction) References() []*addrs.Reference {
 	return result
 }
 
-func (n *NodeAbstractAction) AttachActionSchema(schema *providers.ActionSchema) {
+func (n *NodeActionConfig) AttachActionSchema(schema *providers.ActionSchema) {
 	n.Schema = schema
 }
 
-func (n *NodeAbstractAction) Provider() ProviderRef {
+func (n *NodeActionConfig) Provider() ProviderRef {
 	// If the resolvedProvider is set, use that
 	if n.ResolvedProvider.Provider.Type != "" {
 		ref := ProviderRef{
-			addr:     n.ResolvedProvider,
-			resolved: true,
+			Addr:     n.ResolvedProvider,
+			Resolved: true,
 		}
 		return ref
 	}
@@ -106,14 +107,14 @@ func (n *NodeAbstractAction) Provider() ProviderRef {
 	addr.Alias = n.Config.ProviderConfigAddr().Alias
 	addr.Module = n.ModulePath()
 	return ProviderRef{
-		addr: addr,
+		Addr: addr,
 	}
 }
 
-func (n *NodeAbstractAction) SetProvider(p addrs.AbsProviderConfig) {
+func (n *NodeActionConfig) SetProvider(p addrs.AbsProviderConfig) {
 	n.ResolvedProvider = p
 }
 
-func (n *NodeAbstractAction) AttachDependencies(deps []addrs.ConfigResource) {
+func (n *NodeActionConfig) AttachDependencies(deps []addrs.ConfigResource) {
 	n.Dependencies = deps
 }

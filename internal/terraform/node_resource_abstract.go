@@ -98,7 +98,7 @@ type NodeAbstractResource struct {
 	// that the action nodes can be resolved to the correct provider in the
 	// graph, while allowing the triggering node to also connect to the same
 	// provider.
-	actiontriggers []*nodeAbstractActionTrigger
+	actionTriggers []*resourceActionTrigger
 }
 
 var (
@@ -162,79 +162,104 @@ func (n *NodeAbstractResource) ModifyCreateBeforeDestroy(v bool) error {
 // GraphNodeReferencer
 func (n *NodeAbstractResource) References() []*addrs.Reference {
 	var result []*addrs.Reference
-	// If we have a config then we prefer to use that.
-	if c := n.Config; c != nil {
-		result = append(result, n.DependsOn()...)
 
-		if n.Schema == nil {
-			// Should never happen, but we'll log if it does so that we can
-			// see this easily when debugging.
-			log.Printf("[WARN] no schema is attached to %s, so config references cannot be detected", n.Name())
-		}
+	c := n.Config
 
-		refs, _ := langrefs.ReferencesInExpr(addrs.ParseRef, c.Count)
+	if c == nil {
+		// you can't have references without configuration
+		return nil
+	}
+
+	result = append(result, n.DependsOn()...)
+
+	if n.Schema == nil {
+		// Should never happen, but we'll log if it does so that we can
+		// see this easily when debugging.
+		log.Printf("[WARN] no schema is attached to %s, so config references cannot be detected", n.Name())
+	}
+
+	refs, _ := langrefs.ReferencesInExpr(addrs.ParseRef, c.Count)
+	result = append(result, refs...)
+	refs, _ = langrefs.ReferencesInExpr(addrs.ParseRef, c.ForEach)
+	result = append(result, refs...)
+
+	for _, expr := range c.TriggersReplacement {
+		refs, _ = langrefs.ReferencesInExpr(addrs.ParseRef, expr)
 		result = append(result, refs...)
-		refs, _ = langrefs.ReferencesInExpr(addrs.ParseRef, c.ForEach)
+	}
+
+	// ReferencesInBlock() requires a schema
+	if n.Schema != nil {
+		refs, _ = langrefs.ReferencesInBlock(addrs.ParseRef, c.Config, n.Schema.Body)
 		result = append(result, refs...)
+	}
 
-		for _, expr := range c.TriggersReplacement {
-			refs, _ = langrefs.ReferencesInExpr(addrs.ParseRef, expr)
+	if c.Managed != nil {
+		if c.Managed.Connection != nil {
+			refs, _ = langrefs.ReferencesInBlock(addrs.ParseRef, c.Managed.Connection.Config, connectionBlockSupersetSchema)
 			result = append(result, refs...)
 		}
 
-		// ReferencesInBlock() requires a schema
-		if n.Schema != nil {
-			refs, _ = langrefs.ReferencesInBlock(addrs.ParseRef, c.Config, n.Schema.Body)
-			result = append(result, refs...)
-		}
-
-		if c.Managed != nil {
-			if c.Managed.Connection != nil {
-				refs, _ = langrefs.ReferencesInBlock(addrs.ParseRef, c.Managed.Connection.Config, connectionBlockSupersetSchema)
+		for _, p := range c.Managed.Provisioners {
+			if p.When != configs.ProvisionerWhenCreate {
+				continue
+			}
+			if p.Connection != nil {
+				refs, _ = langrefs.ReferencesInBlock(addrs.ParseRef, p.Connection.Config, connectionBlockSupersetSchema)
 				result = append(result, refs...)
 			}
 
-			for _, p := range c.Managed.Provisioners {
-				if p.When != configs.ProvisionerWhenCreate {
-					continue
-				}
-				if p.Connection != nil {
-					refs, _ = langrefs.ReferencesInBlock(addrs.ParseRef, p.Connection.Config, connectionBlockSupersetSchema)
-					result = append(result, refs...)
-				}
-
-				schema := n.ProvisionerSchemas[p.Type]
-				if schema == nil {
-					log.Printf("[WARN] no schema for provisioner %q is attached to %s, so provisioner block references cannot be detected", p.Type, n.Name())
-				}
-				refs, _ = langrefs.ReferencesInBlock(addrs.ParseRef, p.Config, schema)
-				result = append(result, refs...)
+			schema := n.ProvisionerSchemas[p.Type]
+			if schema == nil {
+				log.Printf("[WARN] no schema for provisioner %q is attached to %s, so provisioner block references cannot be detected", p.Type, n.Name())
 			}
+			refs, _ = langrefs.ReferencesInBlock(addrs.ParseRef, p.Config, schema)
+			result = append(result, refs...)
+		}
+	}
+
+	if c.List != nil {
+		if c.List.IncludeResource != nil {
+			refs, _ := langrefs.ReferencesInExpr(addrs.ParseRef, c.List.IncludeResource)
+			result = append(result, refs...)
+		}
+		if c.List.Limit != nil {
+			refs, _ := langrefs.ReferencesInExpr(addrs.ParseRef, c.List.Limit)
+			result = append(result, refs...)
+		}
+	}
+
+	for _, check := range c.Preconditions {
+		refs, _ := langrefs.ReferencesInExpr(addrs.ParseRef, check.Condition)
+		result = append(result, refs...)
+		refs, _ = langrefs.ReferencesInExpr(addrs.ParseRef, check.ErrorMessage)
+		result = append(result, refs...)
+	}
+	for _, check := range c.Postconditions {
+		refs, _ := langrefs.ReferencesInExpr(addrs.ParseRef, check.Condition)
+		result = append(result, refs...)
+		refs, _ = langrefs.ReferencesInExpr(addrs.ParseRef, check.ErrorMessage)
+		result = append(result, refs...)
+	}
+
+	for _, trigger := range n.actionTriggers {
+		// Connect directly to the action nodes we have stored in the triggers
+		// to let those handle their own refs. This keep the graph structure
+		// more config-like, and takes care of dependencies and provider
+		// resolution. What it doesn't take care of is provider closing, so the
+		// resource will still have to produce it's own provider refs for
+		// actions.
+		for _, action := range trigger.actions {
+			result = append(result, &addrs.Reference{
+				Subject: action.Addr.Action,
+				// this is OK for References(), since they are only used to
+				// connect the graph, and don't need the source or any remaining
+				// traversal
+			})
 		}
 
-		if c.List != nil {
-			if c.List.IncludeResource != nil {
-				refs, _ := langrefs.ReferencesInExpr(addrs.ParseRef, c.List.IncludeResource)
-				result = append(result, refs...)
-			}
-			if c.List.Limit != nil {
-				refs, _ := langrefs.ReferencesInExpr(addrs.ParseRef, c.List.Limit)
-				result = append(result, refs...)
-			}
-		}
-
-		for _, check := range c.Preconditions {
-			refs, _ := langrefs.ReferencesInExpr(addrs.ParseRef, check.Condition)
-			result = append(result, refs...)
-			refs, _ = langrefs.ReferencesInExpr(addrs.ParseRef, check.ErrorMessage)
-			result = append(result, refs...)
-		}
-		for _, check := range c.Postconditions {
-			refs, _ := langrefs.ReferencesInExpr(addrs.ParseRef, check.Condition)
-			result = append(result, refs...)
-			refs, _ = langrefs.ReferencesInExpr(addrs.ParseRef, check.ErrorMessage)
-			result = append(result, refs...)
-		}
+		refs, _ := langrefs.ReferencesInExpr(addrs.ParseRef, trigger.config.Condition)
+		result = append(result, refs...)
 	}
 
 	return result
@@ -287,15 +312,15 @@ func (n *NodeAbstractResource) Provider() ProviderRef {
 	// Once the provider is fully resolved, we can return the known value.
 	if n.ResolvedProvider.Provider.Type != "" {
 		return ProviderRef{
-			addr:     n.ResolvedProvider,
-			resolved: true,
+			Addr:     n.ResolvedProvider,
+			Resolved: true,
 		}
 	}
 
 	// If we have a config we prefer that above all else
 	if n.Config != nil {
 		return ProviderRef{
-			addr: addrs.AbsProviderConfig{
+			Addr: addrs.AbsProviderConfig{
 				Provider: n.Config.Provider,
 				Alias:    n.Config.ProviderConfigAddr().Alias,
 				Module:   n.ModulePath(),
@@ -310,8 +335,8 @@ func (n *NodeAbstractResource) Provider() ProviderRef {
 		// created it. Since we have no config, and no ResolvedProvider, the
 		// provider from the state counts as it being fully resolved.
 		return ProviderRef{
-			addr:     n.storedProviderConfig,
-			resolved: true,
+			Addr:     n.storedProviderConfig,
+			Resolved: true,
 		}
 	}
 
@@ -324,21 +349,21 @@ func (n *NodeAbstractResource) Provider() ProviderRef {
 		// shouldn't matter which we check here, as they'll all give the same.
 		if n.importTargets[0].Config != nil && n.importTargets[0].Config.ProviderConfigRef != nil {
 			ref := ProviderRef{
-				addr: addrs.AbsProviderConfig{
+				Addr: addrs.AbsProviderConfig{
 					Provider: n.importTargets[0].Config.Provider,
 					Alias:    n.importTargets[0].Config.ProviderConfigRef.Alias,
 					Module:   n.ModulePath(),
 				},
 			}
 
-			ref.addr.Alias = n.importTargets[0].Config.ProviderConfigRef.Alias
+			ref.Addr.Alias = n.importTargets[0].Config.ProviderConfigRef.Alias
 			return ref
 		}
 	}
 
 	// No provider configuration found; return a default address
 	return ProviderRef{
-		addr: addrs.AbsProviderConfig{
+		Addr: addrs.AbsProviderConfig{
 			Provider: addrs.ImpliedProviderForUnqualifiedType(n.Addr.Resource.ImpliedProvider()),
 			Module:   n.ModulePath(),
 		},
@@ -348,14 +373,13 @@ func (n *NodeAbstractResource) Provider() ProviderRef {
 func (n *NodeAbstractResource) ActionProviders() []ProviderRef {
 	// actions are not stateful and only run directly from configuration, so we
 	// don't need all the dance around config vs state like in the main
-	// resource, and can just return th connected provider.
+	// resource, and can just return the connected provider.
 
 	var res []ProviderRef
-	for _, trigger := range n.actiontriggers {
-		res = append(res, ProviderRef{
-			addr:     trigger.resolvedProvider,
-			resolved: true,
-		})
+	for _, trigger := range n.actionTriggers {
+		for _, action := range trigger.actions {
+			res = append(res, action.Provider())
+		}
 	}
 	return res
 }
@@ -626,4 +650,11 @@ func graphNodesAreResourceInstancesInDifferentInstancesOfSameModule(a, b dag.Ver
 		return false
 	}
 	return !aModInst.Equal(bModInst)
+}
+
+// TODO: temp container for each trigger and linked action nodes
+type resourceActionTrigger struct {
+	config *configs.ActionTrigger
+
+	actions []*NodeActionConfig
 }

@@ -82,13 +82,13 @@ func (n *nodeAbstractActionTrigger) References() []*addrs.Reference {
 func (n *nodeAbstractActionTrigger) Provider() ProviderRef {
 	if n.resolvedProvider.Provider.Type != "" {
 		return ProviderRef{
-			addr:     n.resolvedProvider,
-			resolved: true,
+			Addr:     n.resolvedProvider,
+			Resolved: true,
 		}
 	}
 
 	return ProviderRef{
-		addr: addrs.AbsProviderConfig{
+		Addr: addrs.AbsProviderConfig{
 			Provider: n.Config.Provider,
 			Module:   n.ModulePath(),
 			Alias:    n.Config.ProviderConfigAddr().Alias,

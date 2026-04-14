@@ -162,28 +162,29 @@ func (b *PlanGraphBuilder) Steps() []GraphTransformer {
 	steps := []GraphTransformer{
 		// Creates all the resources represented in the config
 		&ConfigTransformer{
-			Concrete:       b.ConcreteResource,
-			ConcreteAction: b.ConcreteAction,
-			Config:         b.Config,
-			destroy:        b.Operation == walkDestroy || b.Operation == walkPlanDestroy,
+			Concrete: b.ConcreteResource,
+			// ConcreteAction: b.ConcreteAction,
+			Config:  b.Config,
+			destroy: b.Operation == walkDestroy || b.Operation == walkPlanDestroy,
 
 			importTargets: b.ImportTargets,
 
 			generateConfigPathForImportTargets: b.GenerateConfigPath,
 		},
 
-		&ActionTriggerConfigTransformer{
-			Config:        b.Config,
-			Operation:     b.Operation,
-			ActionTargets: b.ActionTargets,
-			queryPlanMode: b.queryPlan,
+		// FIXME: instead of making trigger nodes, connect resources and their actions
+		// &ActionTriggerConfigTransformer{
+		// 	Config:        b.Config,
+		// 	Operation:     b.Operation,
+		// 	ActionTargets: b.ActionTargets,
+		// 	queryPlanMode: b.queryPlan,
 
-			ConcreteActionTriggerNodeFunc: func(node *nodeAbstractActionTrigger, _ RelativeActionTiming) dag.Vertex {
-				return &nodeActionTriggerPlanExpand{
-					nodeAbstractActionTrigger: node,
-				}
-			},
-		},
+		// 	ConcreteActionTriggerNodeFunc: func(node *nodeAbstractActionTrigger, _ RelativeActionTiming) dag.Vertex {
+		// 		return &nodeActionTriggerPlanExpand{
+		// 			nodeAbstractActionTrigger: node,
+		// 		}
+		// 	},
+		// },
 
 		&ActionInvokePlanTransformer{
 			Config:        b.Config,
@@ -402,9 +403,9 @@ func (b *PlanGraphBuilder) initValidate() {
 		}
 	}
 
-	b.ConcreteAction = func(a *NodeAbstractAction) dag.Vertex {
+	b.ConcreteAction = func(a *NodeActionConfig) dag.Vertex {
 		return &NodeValidatableAction{
-			NodeAbstractAction: a,
+			NodeActionConfig: a,
 		}
 	}
 }

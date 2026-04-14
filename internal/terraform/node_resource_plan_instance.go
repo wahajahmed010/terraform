@@ -358,20 +358,20 @@ func (n *NodePlannableResourceInstance) managedResourceExecute(ctx EvalContext) 
 		}
 	}
 
+	var forEach map[string]cty.Value
+	if n.Config != nil {
+		// these diagnostics would be caught earlier, and adding them here only
+		// causes duplicates
+		forEach, _, _ = evaluateForEachExpression(n.Config.ForEach, ctx, false)
+	}
+
+	repData := EvalDataForInstanceKey(n.ResourceInstanceAddr().Resource.Key, forEach)
+
 	// Plan the instance, unless we're in the refresh-only mode
 	if !n.skipPlanChanges {
 
 		// add this instance to n.forceReplace if replacement is triggered by
 		// another change
-		repData := instances.RepetitionData{}
-		switch k := addr.Resource.Key.(type) {
-		case addrs.IntKey:
-			repData.CountIndex = k.Value()
-		case addrs.StringKey:
-			repData.EachKey = k.Value()
-			repData.EachValue = cty.DynamicVal
-		}
-
 		diags = diags.Append(n.replaceTriggered(ctx, repData))
 		if diags.HasErrors() {
 			// Pre-Diff error hook
@@ -381,8 +381,8 @@ func (n *NodePlannableResourceInstance) managedResourceExecute(ctx EvalContext) 
 			return diags
 		}
 
-		change, instancePlanState, planDeferred, repeatData, planDiags := n.plan(
-			ctx, nil, instanceRefreshState, n.ForceCreateBeforeDestroy, n.forceReplace,
+		change, instancePlanState, planDeferred, planDiags := n.plan(
+			ctx, nil, instanceRefreshState, n.ForceCreateBeforeDestroy, n.forceReplace, repData,
 		)
 		diags = diags.Append(planDiags)
 		if diags.HasErrors() {
@@ -496,7 +496,7 @@ func (n *NodePlannableResourceInstance) managedResourceExecute(ctx EvalContext) 
 			checkDiags := evalCheckRules(
 				addrs.ResourcePostcondition,
 				n.Config.Postconditions,
-				ctx, n.ResourceInstanceAddr(), repeatData,
+				ctx, n.ResourceInstanceAddr(), repData,
 				checkRuleSeverity,
 			)
 			diags = diags.Append(checkDiags)

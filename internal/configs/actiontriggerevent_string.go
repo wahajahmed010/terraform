@@ -8,19 +8,19 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[Unknown-0]
-	_ = x[BeforeCreate-1]
-	_ = x[AfterCreate-2]
-	_ = x[BeforeUpdate-3]
-	_ = x[AfterUpdate-4]
-	_ = x[BeforeDestroy-5]
-	_ = x[AfterDestroy-6]
-	_ = x[Invoke-7]
+	_ = x[EventUnknown-0]
+	_ = x[EventBeforeCreate-1]
+	_ = x[EventAfterCreate-2]
+	_ = x[EventBeforeUpdate-3]
+	_ = x[EventAfterUpdate-4]
+	_ = x[EventBeforeDestroy-5]
+	_ = x[EventAfterDestroy-6]
+	_ = x[EventInvoke-7]
 }
 
-const _ActionTriggerEvent_name = "UnknownBeforeCreateAfterCreateBeforeUpdateAfterUpdateBeforeDestroyAfterDestroyInvoke"
+const _ActionTriggerEvent_name = "EventUnknownEventBeforeCreateEventAfterCreateEventBeforeUpdateEventAfterUpdateEventBeforeDestroyEventAfterDestroyEventInvoke"
 
-var _ActionTriggerEvent_index = [...]uint8{0, 7, 19, 30, 42, 53, 66, 78, 84}
+var _ActionTriggerEvent_index = [...]uint8{0, 12, 29, 45, 62, 78, 96, 113, 124}
 
 func (i ActionTriggerEvent) String() string {
 	idx := int(i) - 0

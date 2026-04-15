@@ -110,7 +110,7 @@ func (t *InvokeActionTrigger) String() string {
 }
 
 func (t *InvokeActionTrigger) TriggerEvent() configs.ActionTriggerEvent {
-	return configs.Invoke
+	return configs.EventInvoke
 }
 
 func (t *InvokeActionTrigger) Equals(other ActionTrigger) bool {

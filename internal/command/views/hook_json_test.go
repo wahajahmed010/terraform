@@ -38,7 +38,7 @@ func testJSONLifecycleHook(actionAddr addrs.AbsActionInstance, triggeringResourc
 			TriggeringResourceAddr:  triggeringResourceAddr,
 			ActionTriggerBlockIndex: actionTriggerIndex,
 			ActionsListIndex:        actionsListIndex,
-			ActionTriggerEvent:      configs.AfterCreate,
+			ActionTriggerEvent:      configs.EventAfterCreate,
 		},
 	}
 }

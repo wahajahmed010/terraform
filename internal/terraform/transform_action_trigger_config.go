@@ -87,9 +87,9 @@ func (t *ActionTriggerConfigTransformer) transformSingle(g *Graph, config *confi
 			containsAfterEvent := false
 			for _, event := range at.Events {
 				switch event {
-				case configs.BeforeCreate, configs.BeforeUpdate:
+				case configs.EventBeforeCreate, configs.EventBeforeUpdate:
 					containsBeforeEvent = true
-				case configs.AfterCreate, configs.AfterUpdate:
+				case configs.EventAfterCreate, configs.EventAfterUpdate:
 					containsAfterEvent = true
 				}
 			}

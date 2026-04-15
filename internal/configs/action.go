@@ -56,14 +56,14 @@ type ActionTriggerEvent int
 //go:generate go tool golang.org/x/tools/cmd/stringer -type ActionTriggerEvent
 
 const (
-	Unknown ActionTriggerEvent = iota
-	BeforeCreate
-	AfterCreate
-	BeforeUpdate
-	AfterUpdate
-	BeforeDestroy
-	AfterDestroy
-	Invoke
+	EventUnknown ActionTriggerEvent = iota
+	EventBeforeCreate
+	EventAfterCreate
+	EventBeforeUpdate
+	EventAfterUpdate
+	EventBeforeDestroy
+	EventAfterDestroy
+	EventInvoke
 )
 
 // ActionRef represents a reference to a configured Action
@@ -114,15 +114,15 @@ func decodeActionTriggerBlock(block *hcl.Block) (*ActionTrigger, hcl.Diagnostics
 			var event ActionTriggerEvent
 			switch hcl.ExprAsKeyword(expr) {
 			case "before_create":
-				event = BeforeCreate
+				event = EventBeforeCreate
 				containsBefore = true
 			case "after_create":
-				event = AfterCreate
+				event = EventAfterCreate
 			case "before_update":
-				event = BeforeUpdate
+				event = EventBeforeUpdate
 				containsBefore = true
 			case "after_update":
-				event = AfterUpdate
+				event = EventAfterUpdate
 			default:
 				diags = append(diags, &hcl.Diagnostic{
 					Severity: hcl.DiagError,

@@ -1112,19 +1112,19 @@ func actionIsTriggeredByEvent(events []configs.ActionTriggerEvent, action plans.
 	triggeredEvents := []configs.ActionTriggerEvent{}
 	for _, event := range events {
 		switch event {
-		case configs.BeforeCreate, configs.AfterCreate:
+		case configs.EventBeforeCreate, configs.EventAfterCreate:
 			if action.IsReplace() || action == plans.Create {
 				triggeredEvents = append(triggeredEvents, event)
 			} else {
 				continue
 			}
-		case configs.BeforeUpdate, configs.AfterUpdate:
+		case configs.EventBeforeUpdate, configs.EventAfterUpdate:
 			if action == plans.Update {
 				triggeredEvents = append(triggeredEvents, event)
 			} else {
 				continue
 			}
-		case configs.BeforeDestroy, configs.AfterDestroy:
+		case configs.EventBeforeDestroy, configs.EventAfterDestroy:
 			if action == plans.DeleteThenCreate || action == plans.CreateThenDelete || action == plans.Delete {
 				triggeredEvents = append(triggeredEvents, event)
 			} else {

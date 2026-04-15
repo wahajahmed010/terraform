@@ -427,7 +427,7 @@ resource "test_object" "a" {
 					if at.ActionTriggerBlockIndex != 0 {
 						t.Fatalf("expected action to have a triggering block index of 0, got %d", at.ActionTriggerBlockIndex)
 					}
-					if at.TriggerEvent() != configs.BeforeCreate {
+					if at.TriggerEvent() != configs.EventBeforeCreate {
 						t.Fatalf("expected action to have a triggering event of 'before_create', got '%s'", at.TriggerEvent())
 					}
 					if at.ActionsListIndex != 0 {
@@ -776,7 +776,7 @@ resource "test_object" "a" {
 						triggeredEvents = append(triggeredEvents, at.ActionTriggerEvent)
 					}
 					slices.Sort(triggeredEvents)
-					if diff := cmp.Diff([]configs.ActionTriggerEvent{configs.BeforeCreate, configs.AfterCreate}, triggeredEvents); diff != "" {
+					if diff := cmp.Diff([]configs.ActionTriggerEvent{configs.EventBeforeCreate, configs.EventAfterCreate}, triggeredEvents); diff != "" {
 						t.Errorf("wrong result\n%s", diff)
 					}
 				},
@@ -841,7 +841,7 @@ resource "test_object" "a" {
 						triggeredEvents = append(triggeredEvents, at.ActionTriggerEvent)
 					}
 					slices.Sort(triggeredEvents)
-					if diff := cmp.Diff([]configs.ActionTriggerEvent{configs.BeforeCreate, configs.AfterCreate}, triggeredEvents); diff != "" {
+					if diff := cmp.Diff([]configs.ActionTriggerEvent{configs.EventBeforeCreate, configs.EventAfterCreate}, triggeredEvents); diff != "" {
 						t.Errorf("wrong result\n%s", diff)
 					}
 				},
@@ -1291,7 +1291,7 @@ resource "test_object" "a" {
 						t.Fatalf("expected one action in plan, got %d", len(p.Changes.ActionInvocations))
 					}
 
-					if p.Changes.ActionInvocations[0].ActionTrigger.TriggerEvent() != configs.AfterCreate {
+					if p.Changes.ActionInvocations[0].ActionTrigger.TriggerEvent() != configs.EventAfterCreate {
 						t.Fatalf("expected trigger event to be of type AfterCreate, got: %v", p.Changes.ActionInvocations[0].ActionTrigger)
 					}
 
@@ -1654,7 +1654,7 @@ resource "other_object" "a" {
 					if at.ActionTriggerBlockIndex != 0 {
 						t.Fatalf("expected action to have a triggering block index of 0, got %d", at.ActionTriggerBlockIndex)
 					}
-					if at.TriggerEvent() != configs.BeforeCreate {
+					if at.TriggerEvent() != configs.EventBeforeCreate {
 						t.Fatalf("expected action to have a triggering event of 'before_create', got '%s'", at.TriggerEvent())
 					}
 					if at.ActionsListIndex != 0 {
@@ -1725,7 +1725,7 @@ resource "other_object" "a" {
 					if at.ActionTriggerBlockIndex != 0 {
 						t.Fatalf("expected action to have a triggering block index of 0, got %d", at.ActionTriggerBlockIndex)
 					}
-					if at.TriggerEvent() != configs.BeforeCreate {
+					if at.TriggerEvent() != configs.EventBeforeCreate {
 						t.Fatalf("expected action to have a triggering event of 'before_create', got '%s'", at.TriggerEvent())
 					}
 					if at.ActionsListIndex != 0 {

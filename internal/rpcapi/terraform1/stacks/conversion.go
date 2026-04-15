@@ -50,19 +50,19 @@ func ChangeTypesForPlanAction(action plans.Action) ([]ChangeType, error) {
 // to its [StackChangeProgress_ActionTriggerEvent] protobuf equivalent.
 func ActionTriggerEventForStackChangeProgress(event configs.ActionTriggerEvent) (StackChangeProgress_ActionTriggerEvent, error) {
 	switch event {
-	case configs.BeforeCreate:
+	case configs.EventBeforeCreate:
 		return StackChangeProgress_BEFORE_CREATE, nil
-	case configs.AfterCreate:
+	case configs.EventAfterCreate:
 		return StackChangeProgress_AFTER_CREATE, nil
-	case configs.BeforeUpdate:
+	case configs.EventBeforeUpdate:
 		return StackChangeProgress_BEFORE_UPDATE, nil
-	case configs.AfterUpdate:
+	case configs.EventAfterUpdate:
 		return StackChangeProgress_AFTER_UPDATE, nil
-	case configs.BeforeDestroy:
+	case configs.EventBeforeDestroy:
 		return StackChangeProgress_BEFORE_DESTROY, nil
-	case configs.AfterDestroy:
+	case configs.EventAfterDestroy:
 		return StackChangeProgress_AFTER_DESTROY, nil
-	case configs.Invoke:
+	case configs.EventInvoke:
 		return StackChangeProgress_INVOKE, nil
 	default:
 		return StackChangeProgress_INVALID_EVENT, fmt.Errorf("unsupported trigger event %s", event)
@@ -73,19 +73,19 @@ func ActionTriggerEventForStackChangeProgress(event configs.ActionTriggerEvent) 
 // to its [PlannedChange_ActionTriggerEvent] protobuf equivalent.
 func ActionTriggerEventForPlannedChange(event configs.ActionTriggerEvent) (PlannedChange_ActionTriggerEvent, error) {
 	switch event {
-	case configs.BeforeCreate:
+	case configs.EventBeforeCreate:
 		return PlannedChange_BEFORE_CREATE, nil
-	case configs.AfterCreate:
+	case configs.EventAfterCreate:
 		return PlannedChange_AFTER_CREATE, nil
-	case configs.BeforeUpdate:
+	case configs.EventBeforeUpdate:
 		return PlannedChange_BEFORE_UPDATE, nil
-	case configs.AfterUpdate:
+	case configs.EventAfterUpdate:
 		return PlannedChange_AFTER_UPDATE, nil
-	case configs.BeforeDestroy:
+	case configs.EventBeforeDestroy:
 		return PlannedChange_BEFORE_DESTROY, nil
-	case configs.AfterDestroy:
+	case configs.EventAfterDestroy:
 		return PlannedChange_AFTER_DESTROY, nil
-	case configs.Invoke:
+	case configs.EventInvoke:
 		return PlannedChange_INVOKE, nil
 	default:
 		return PlannedChange_INVALID_EVENT, fmt.Errorf("unsupported trigger event %s", event)

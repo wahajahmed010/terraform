@@ -78,7 +78,7 @@ func (n *nodeActionTriggerPlanInstance) Execute(ctx EvalContext, operation walkO
 	// We need the action invocation early to check if we need to
 	ai := plans.ActionInvocationInstance{
 		Addr:          n.actionAddress,
-		ActionTrigger: n.lifecycleActionTrigger.ActionTrigger(configs.Unknown),
+		ActionTrigger: n.lifecycleActionTrigger.ActionTrigger(configs.EventUnknown),
 	}
 	change := ctx.Changes().GetResourceInstanceChange(n.lifecycleActionTrigger.resourceAddress, n.lifecycleActionTrigger.resourceAddress.CurrentObject().DeposedKey)
 
@@ -296,7 +296,7 @@ func evaluateActionCondition(ctx EvalContext, at actionConditionContext) (bool, 
 func containsBeforeEvent(events []configs.ActionTriggerEvent) bool {
 	for _, event := range events {
 		switch event {
-		case configs.BeforeCreate, configs.BeforeUpdate:
+		case configs.EventBeforeCreate, configs.EventBeforeUpdate:
 			return true
 		default:
 			continue

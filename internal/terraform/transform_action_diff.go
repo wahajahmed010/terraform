@@ -32,8 +32,8 @@ func (t *ActionDiffTransformer) Transform(g *Graph) error {
 		if !ok {
 			continue
 		}
-		isBefore := lat.ActionTriggerEvent == configs.BeforeCreate || lat.ActionTriggerEvent == configs.BeforeUpdate
-		isAfter := lat.ActionTriggerEvent == configs.AfterCreate || lat.ActionTriggerEvent == configs.AfterUpdate
+		isBefore := lat.ActionTriggerEvent == configs.EventBeforeCreate || lat.ActionTriggerEvent == configs.EventBeforeUpdate
+		isAfter := lat.ActionTriggerEvent == configs.EventAfterCreate || lat.ActionTriggerEvent == configs.EventAfterUpdate
 
 		atns, ok := actionTriggerNodes.GetOk(lat.TriggeringResourceAddr.ConfigResource())
 		if !ok {

@@ -114,10 +114,10 @@ resource "test_object" "a" {
 
 				// the before should have happened first, and the order should
 				// be correct.
-				evaluateHook(capture.startActionHooks[0], "action.action_example.hello", configs.BeforeCreate)
-				evaluateHook(capture.completeActionHooks[0], "action.action_example.hello", configs.BeforeCreate)
-				evaluateHook(capture.startActionHooks[1], "action.action_example.hello", configs.AfterCreate)
-				evaluateHook(capture.completeActionHooks[1], "action.action_example.hello", configs.AfterCreate)
+				evaluateHook(capture.startActionHooks[0], "action.action_example.hello", configs.EventBeforeCreate)
+				evaluateHook(capture.completeActionHooks[0], "action.action_example.hello", configs.EventBeforeCreate)
+				evaluateHook(capture.startActionHooks[1], "action.action_example.hello", configs.EventAfterCreate)
+				evaluateHook(capture.completeActionHooks[1], "action.action_example.hello", configs.EventAfterCreate)
 			},
 		},
 

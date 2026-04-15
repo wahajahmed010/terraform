@@ -1018,7 +1018,7 @@ func TestPlannedChangeAsProto(t *testing.T) {
 							Type: "example_resource",
 							Name: "main",
 						}.Instance(addrs.NoKey).Absolute(addrs.RootModuleInstance),
-						ActionTriggerEvent:      configs.AfterCreate,
+						ActionTriggerEvent:      configs.EventAfterCreate,
 						ActionTriggerBlockIndex: 0,
 						ActionsListIndex:        0,
 					},

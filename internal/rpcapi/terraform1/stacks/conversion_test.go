@@ -20,14 +20,14 @@ func TestActionTriggerEventForStackChangeProgress(t *testing.T) {
 		want    StackChangeProgress_ActionTriggerEvent
 		wantErr bool
 	}{
-		{configs.BeforeCreate, StackChangeProgress_BEFORE_CREATE, false},
-		{configs.AfterCreate, StackChangeProgress_AFTER_CREATE, false},
-		{configs.BeforeUpdate, StackChangeProgress_BEFORE_UPDATE, false},
-		{configs.AfterUpdate, StackChangeProgress_AFTER_UPDATE, false},
-		{configs.BeforeDestroy, StackChangeProgress_BEFORE_DESTROY, false},
-		{configs.AfterDestroy, StackChangeProgress_AFTER_DESTROY, false},
-		{configs.Invoke, StackChangeProgress_INVOKE, false},
-		{configs.Unknown, StackChangeProgress_INVALID_EVENT, true},
+		{configs.EventBeforeCreate, StackChangeProgress_BEFORE_CREATE, false},
+		{configs.EventAfterCreate, StackChangeProgress_AFTER_CREATE, false},
+		{configs.EventBeforeUpdate, StackChangeProgress_BEFORE_UPDATE, false},
+		{configs.EventAfterUpdate, StackChangeProgress_AFTER_UPDATE, false},
+		{configs.EventBeforeDestroy, StackChangeProgress_BEFORE_DESTROY, false},
+		{configs.EventAfterDestroy, StackChangeProgress_AFTER_DESTROY, false},
+		{configs.EventInvoke, StackChangeProgress_INVOKE, false},
+		{configs.EventUnknown, StackChangeProgress_INVALID_EVENT, true},
 	}
 
 	for _, tt := range tests {
@@ -49,14 +49,14 @@ func TestActionTriggerEventForPlannedChange(t *testing.T) {
 		want    PlannedChange_ActionTriggerEvent
 		wantErr bool
 	}{
-		{configs.BeforeCreate, PlannedChange_BEFORE_CREATE, false},
-		{configs.AfterCreate, PlannedChange_AFTER_CREATE, false},
-		{configs.BeforeUpdate, PlannedChange_BEFORE_UPDATE, false},
-		{configs.AfterUpdate, PlannedChange_AFTER_UPDATE, false},
-		{configs.BeforeDestroy, PlannedChange_BEFORE_DESTROY, false},
-		{configs.AfterDestroy, PlannedChange_AFTER_DESTROY, false},
-		{configs.Invoke, PlannedChange_INVOKE, false},
-		{configs.Unknown, PlannedChange_INVALID_EVENT, true},
+		{configs.EventBeforeCreate, PlannedChange_BEFORE_CREATE, false},
+		{configs.EventAfterCreate, PlannedChange_AFTER_CREATE, false},
+		{configs.EventBeforeUpdate, PlannedChange_BEFORE_UPDATE, false},
+		{configs.EventAfterUpdate, PlannedChange_AFTER_UPDATE, false},
+		{configs.EventBeforeDestroy, PlannedChange_BEFORE_DESTROY, false},
+		{configs.EventAfterDestroy, PlannedChange_AFTER_DESTROY, false},
+		{configs.EventInvoke, PlannedChange_INVOKE, false},
+		{configs.EventUnknown, PlannedChange_INVALID_EVENT, true},
 	}
 
 	for _, tt := range tests {

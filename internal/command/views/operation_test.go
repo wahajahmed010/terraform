@@ -575,7 +575,7 @@ func TestOperationJSON_plan_with_actions(t *testing.T) {
 		Addr: addrs.Action{Type: "test_action", Name: "hello"}.Instance(addrs.NoKey).Absolute(root),
 		ActionTrigger: &plans.ResourceActionTrigger{
 			TriggeringResourceAddr:  boop,
-			ActionTriggerEvent:      configs.AfterCreate,
+			ActionTriggerEvent:      configs.EventAfterCreate,
 			ActionTriggerBlockIndex: 0,
 			ActionsListIndex:        0,
 		},
@@ -584,7 +584,7 @@ func TestOperationJSON_plan_with_actions(t *testing.T) {
 		Addr: addrs.Action{Type: "test_other_action", Name: "world"}.Instance(addrs.NoKey).Absolute(root),
 		ActionTrigger: &plans.ResourceActionTrigger{
 			TriggeringResourceAddr:  boop,
-			ActionTriggerEvent:      configs.AfterCreate,
+			ActionTriggerEvent:      configs.EventAfterCreate,
 			ActionTriggerBlockIndex: 0,
 			ActionsListIndex:        1,
 		},
@@ -593,7 +593,7 @@ func TestOperationJSON_plan_with_actions(t *testing.T) {
 		Addr: addrs.Action{Type: "test_action", Name: "goodbye"}.Instance(addrs.IntKey(0)).Absolute(vpc),
 		ActionTrigger: &plans.ResourceActionTrigger{
 			TriggeringResourceAddr:  beep,
-			ActionTriggerEvent:      configs.BeforeUpdate,
+			ActionTriggerEvent:      configs.EventBeforeUpdate,
 			ActionTriggerBlockIndex: 1,
 			ActionsListIndex:        0,
 		},

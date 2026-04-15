@@ -105,7 +105,7 @@ func TestDecodeActionTriggerBlock(t *testing.T) {
 			},
 			&ActionTrigger{
 				Condition: trueConditionExpr,
-				Events:    []ActionTriggerEvent{AfterCreate, AfterUpdate},
+				Events:    []ActionTriggerEvent{EventAfterCreate, EventAfterUpdate},
 				Actions: []ActionRef{
 					{
 						fooActionExpr,
@@ -132,7 +132,7 @@ func TestDecodeActionTriggerBlock(t *testing.T) {
 			},
 			&ActionTrigger{
 				Condition: trueConditionExpr,
-				Events:    []ActionTriggerEvent{AfterCreate, AfterUpdate},
+				Events:    []ActionTriggerEvent{EventAfterCreate, EventAfterUpdate},
 				Actions: []ActionRef{
 					{
 						Expr:  moduleActionExpr,
@@ -158,7 +158,7 @@ func TestDecodeActionTriggerBlock(t *testing.T) {
 			},
 			&ActionTrigger{
 				Condition: trueConditionExpr,
-				Events:    []ActionTriggerEvent{AfterCreate, AfterUpdate},
+				Events:    []ActionTriggerEvent{EventAfterCreate, EventAfterUpdate},
 				Actions: []ActionRef{
 					{
 						Expr:  fooDataSourceExpr,
@@ -210,7 +210,7 @@ func TestDecodeActionTriggerBlock(t *testing.T) {
 			},
 			&ActionTrigger{
 				Condition: trueConditionExpr,
-				Events:    []ActionTriggerEvent{BeforeCreate},
+				Events:    []ActionTriggerEvent{EventBeforeCreate},
 				Actions: []ActionRef{
 					{
 						fooActionExpr,
@@ -235,7 +235,7 @@ func TestDecodeActionTriggerBlock(t *testing.T) {
 			},
 			&ActionTrigger{
 				Condition: hcltest.MockExprTraversalSrc("self.id"),
-				Events:    []ActionTriggerEvent{BeforeCreate, AfterCreate},
+				Events:    []ActionTriggerEvent{EventBeforeCreate, EventAfterCreate},
 				Actions: []ActionRef{
 					{
 						fooActionExpr,
@@ -260,7 +260,7 @@ func TestDecodeActionTriggerBlock(t *testing.T) {
 			},
 			&ActionTrigger{
 				Condition: countExpr,
-				Events:    []ActionTriggerEvent{BeforeCreate, AfterCreate},
+				Events:    []ActionTriggerEvent{EventBeforeCreate, EventAfterCreate},
 				Actions: []ActionRef{
 					{
 						fooActionExpr,
@@ -285,7 +285,7 @@ func TestDecodeActionTriggerBlock(t *testing.T) {
 			},
 			&ActionTrigger{
 				Condition: eachExpr,
-				Events:    []ActionTriggerEvent{BeforeCreate, AfterCreate},
+				Events:    []ActionTriggerEvent{EventBeforeCreate, EventAfterCreate},
 				Actions: []ActionRef{
 					{
 						fooActionExpr,

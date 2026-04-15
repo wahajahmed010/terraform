@@ -71,9 +71,9 @@ func precomputeDiffs(plan Plan, mode plans.Mode) diffs {
 			}
 
 			switch action.LifecycleActionTrigger.ActionTriggerEvent {
-			case configs.BeforeCreate.String(), configs.BeforeUpdate.String(), configs.BeforeDestroy.String():
+			case configs.EventBeforeCreate.String(), configs.EventBeforeUpdate.String(), configs.EventBeforeDestroy.String():
 				before = append(before, action)
-			case configs.AfterCreate.String(), configs.AfterUpdate.String(), configs.AfterDestroy.String():
+			case configs.EventAfterCreate.String(), configs.EventAfterUpdate.String(), configs.EventAfterDestroy.String():
 				after = append(after, action)
 			default:
 				// The switch should be exhaustive.

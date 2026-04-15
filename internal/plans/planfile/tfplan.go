@@ -1355,17 +1355,17 @@ func actionInvocationFromTfplan(rawAction *planproto.ActionInvocationInstance) (
 		var ate configs.ActionTriggerEvent
 		switch at.ResourceActionTrigger.TriggerEvent {
 		case planproto.ActionTriggerEvent_BEFORE_CERATE:
-			ate = configs.BeforeCreate
+			ate = configs.EventBeforeCreate
 		case planproto.ActionTriggerEvent_AFTER_CREATE:
-			ate = configs.AfterCreate
+			ate = configs.EventAfterCreate
 		case planproto.ActionTriggerEvent_BEFORE_UPDATE:
-			ate = configs.BeforeUpdate
+			ate = configs.EventBeforeUpdate
 		case planproto.ActionTriggerEvent_AFTER_UPDATE:
-			ate = configs.AfterUpdate
+			ate = configs.EventAfterUpdate
 		case planproto.ActionTriggerEvent_BEFORE_DESTROY:
-			ate = configs.BeforeDestroy
+			ate = configs.EventBeforeDestroy
 		case planproto.ActionTriggerEvent_AFTER_DESTROY:
-			ate = configs.AfterDestroy
+			ate = configs.EventAfterDestroy
 
 		default:
 			return nil, fmt.Errorf("invalid action trigger event %s", at.ResourceActionTrigger.TriggerEvent)
@@ -1419,17 +1419,17 @@ func actionInvocationToTfPlan(action *plans.ActionInvocationInstanceSrc) (*planp
 	case *plans.ResourceActionTrigger:
 		triggerEvent := planproto.ActionTriggerEvent_INVALID_EVENT
 		switch at.ActionTriggerEvent {
-		case configs.BeforeCreate:
+		case configs.EventBeforeCreate:
 			triggerEvent = planproto.ActionTriggerEvent_BEFORE_CERATE
-		case configs.AfterCreate:
+		case configs.EventAfterCreate:
 			triggerEvent = planproto.ActionTriggerEvent_AFTER_CREATE
-		case configs.BeforeUpdate:
+		case configs.EventBeforeUpdate:
 			triggerEvent = planproto.ActionTriggerEvent_BEFORE_UPDATE
-		case configs.AfterUpdate:
+		case configs.EventAfterUpdate:
 			triggerEvent = planproto.ActionTriggerEvent_AFTER_UPDATE
-		case configs.BeforeDestroy:
+		case configs.EventBeforeDestroy:
 			triggerEvent = planproto.ActionTriggerEvent_BEFORE_DESTROY
-		case configs.AfterDestroy:
+		case configs.EventAfterDestroy:
 			triggerEvent = planproto.ActionTriggerEvent_AFTER_DESTROY
 		}
 		ret.ActionTrigger = &planproto.ActionInvocationInstance_ResourceActionTrigger{

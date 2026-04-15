@@ -116,7 +116,7 @@ func TestAddRaw_ActionInvocations(t *testing.T) {
 		Addr: addrs.RootModuleInstance.ActionInstance("webhook", "notify", addrs.NoKey),
 		ActionTrigger: &plans.ResourceActionTrigger{
 			TriggeringResourceAddr:  addrs.RootModuleInstance.ResourceInstance(addrs.ManagedResourceMode, "example_resource", "main", addrs.NoKey),
-			ActionTriggerEvent:      configs.AfterCreate,
+			ActionTriggerEvent:      configs.EventAfterCreate,
 			ActionTriggerBlockIndex: 0,
 			ActionsListIndex:        0,
 		},

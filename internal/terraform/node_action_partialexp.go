@@ -12,7 +12,7 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-// NodeActionDeclarationPartialExpanded is a graph node that stands in for
+// UNUSED_NodeActionDeclarationPartialExpanded is a graph node that stands in for
 // an unbounded set of potential action instances that we don't yet know.
 //
 // Its job is to check the configuration as much as we can with the information
@@ -21,7 +21,7 @@ import (
 // for use when evaluating other objects that refer to this resource.
 //
 // This is the partial-expanded equivalent of NodeActionDeclarationInstance.
-type NodeActionDeclarationPartialExpanded struct {
+type UNUSED_NodeActionDeclarationPartialExpanded struct {
 	addr             addrs.PartialExpandedAction
 	config           configs.Action
 	Schema           *providers.ActionSchema
@@ -29,17 +29,17 @@ type NodeActionDeclarationPartialExpanded struct {
 }
 
 var (
-	_ graphNodeEvalContextScope = (*NodeActionDeclarationPartialExpanded)(nil)
-	_ GraphNodeExecutable       = (*NodeActionDeclarationPartialExpanded)(nil)
+	_ graphNodeEvalContextScope = (*UNUSED_NodeActionDeclarationPartialExpanded)(nil)
+	_ GraphNodeExecutable       = (*UNUSED_NodeActionDeclarationPartialExpanded)(nil)
 )
 
 // Name implements [dag.NamedVertex].
-func (n *NodeActionDeclarationPartialExpanded) Name() string {
+func (n *UNUSED_NodeActionDeclarationPartialExpanded) Name() string {
 	return n.addr.String()
 }
 
 // Path implements graphNodeEvalContextScope.
-func (n *NodeActionDeclarationPartialExpanded) Path() evalContextScope {
+func (n *UNUSED_NodeActionDeclarationPartialExpanded) Path() evalContextScope {
 	if moduleAddr, ok := n.addr.ModuleInstance(); ok {
 		return evalContextModuleInstance{Addr: moduleAddr}
 	} else if moduleAddr, ok := n.addr.PartialExpandedModule(); ok {
@@ -51,12 +51,12 @@ func (n *NodeActionDeclarationPartialExpanded) Path() evalContextScope {
 	}
 }
 
-func (n *NodeActionDeclarationPartialExpanded) ActionAddr() addrs.ConfigAction {
+func (n *UNUSED_NodeActionDeclarationPartialExpanded) ActionAddr() addrs.ConfigAction {
 	return n.addr.ConfigAction()
 }
 
 // Execute implements GraphNodeExecutable.
-func (n *NodeActionDeclarationPartialExpanded) Execute(ctx EvalContext, op walkOperation) tfdiags.Diagnostics {
+func (n *UNUSED_NodeActionDeclarationPartialExpanded) Execute(ctx EvalContext, op walkOperation) tfdiags.Diagnostics {
 	var diags tfdiags.Diagnostics
 	ctx.Deferrals().ReportActionExpansionDeferred(n.addr)
 	configVal := cty.NullVal(n.Schema.ConfigSchema.ImpliedType())

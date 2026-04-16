@@ -7,8 +7,11 @@ import (
 	"github.com/hashicorp/terraform/internal/addrs"
 	"github.com/hashicorp/terraform/internal/configs"
 	"github.com/hashicorp/terraform/internal/dag"
+	"github.com/hashicorp/terraform/internal/instances"
 	"github.com/hashicorp/terraform/internal/lang/langrefs"
 	"github.com/hashicorp/terraform/internal/providers"
+	"github.com/hashicorp/terraform/internal/tfdiags"
+	"github.com/zclconf/go-cty/cty"
 )
 
 // NodeActionConfig represents an action in the configuration. This node is
@@ -26,6 +29,8 @@ type NodeActionConfig struct {
 	ResolvedProvider addrs.AbsProviderConfig
 	Schema           *providers.ActionSchema
 	Dependencies     []addrs.ConfigResource
+
+	// TODO: cache evaluations
 }
 
 var (
@@ -117,4 +122,116 @@ func (n *NodeActionConfig) SetProvider(p addrs.AbsProviderConfig) {
 
 func (n *NodeActionConfig) AttachDependencies(deps []addrs.ConfigResource) {
 	n.Dependencies = deps
+}
+
+// FIXME: unknown repdata deferrals
+func (n *NodeActionConfig) repetitionData(ctx EvalContext) ([]instances.RepetitionData, tfdiags.Diagnostics) {
+	var diags tfdiags.Diagnostics
+	var reps []instances.RepetitionData
+
+	switch {
+	case n.Config.Count != nil:
+		count, countDiags := evaluateCountExpression(n.Config.Count, ctx, false)
+		diags = diags.Append(countDiags)
+		if diags.HasErrors() {
+			return nil, diags
+		}
+
+		for i := 0; i < count; i++ {
+			reps = append(reps, instances.RepetitionData{
+				CountIndex: cty.NumberIntVal(int64(i)),
+			})
+		}
+
+		return reps, diags
+
+	case n.Config.ForEach != nil:
+		forEach, _, forEachDiags := evaluateForEachExpression(n.Config.ForEach, ctx, false)
+		diags = diags.Append(forEachDiags)
+		if forEachDiags.HasErrors() {
+			return reps, diags
+		}
+
+		for key, value := range forEach {
+			reps = append(reps, instances.RepetitionData{
+				EachKey:   cty.StringVal(key),
+				EachValue: value,
+			})
+		}
+		return reps, diags
+
+	default:
+		return nil, diags
+	}
+}
+
+// Eval returns the value of the expanded config block.
+func (n *NodeActionConfig) Eval(ctx EvalContext) (cty.Value, tfdiags.Diagnostics) {
+	var diags tfdiags.Diagnostics
+
+	// FIXME: deferrals?
+
+	// This should have been caught already
+	if n.Schema == nil {
+		panic("action eval called without a schema")
+	}
+
+	actionInstances, diags := n.repetitionData(ctx)
+	if diags.HasErrors() {
+		return cty.DynamicVal, diags
+	}
+
+	switch {
+	case n.Config.Count != nil:
+		var vals []cty.Value
+		for _, inst := range actionInstances {
+			val, evalDiags := n.evalInstance(ctx, inst)
+			diags = diags.Append(evalDiags)
+			if evalDiags.HasErrors() {
+				return cty.DynamicVal, diags
+			}
+
+			vals = append(vals, val)
+		}
+		return cty.TupleVal(vals), diags
+
+	case n.Config.ForEach != nil:
+		vals := make(map[string]cty.Value)
+		for _, inst := range actionInstances {
+			val, evalDiags := n.evalInstance(ctx, inst)
+			diags = diags.Append(evalDiags)
+			if evalDiags.HasErrors() {
+				return cty.DynamicVal, diags
+			}
+
+			vals[inst.EachKey.AsString()] = val
+		}
+
+		return cty.ObjectVal(vals), diags
+
+	default:
+		return n.evalInstance(ctx, instances.RepetitionData{})
+	}
+}
+
+func (n *NodeActionConfig) evalInstance(ctx EvalContext, repData instances.RepetitionData) (cty.Value, tfdiags.Diagnostics) {
+
+	var diags tfdiags.Diagnostics
+	configVal := cty.NullVal(n.Schema.ConfigSchema.ImpliedType())
+	if n.Config.Config != nil {
+		var configDiags tfdiags.Diagnostics
+		configVal, _, configDiags = ctx.EvaluateBlock(n.Config.Config, n.Schema.ConfigSchema.DeepCopy(), nil, repData)
+		diags = diags.Append(configDiags)
+		if configDiags.HasErrors() {
+			return configVal, diags
+		}
+
+		valDiags := validateResourceForbiddenEphemeralValues(ctx, configVal, n.Schema.ConfigSchema)
+		diags = diags.Append(valDiags.InConfigBody(n.Config.Config, n.Addr.String()))
+
+		var deprecationDiags tfdiags.Diagnostics
+		configVal, deprecationDiags = ctx.Deprecations().ValidateAndUnmarkConfig(configVal, n.Schema.ConfigSchema, n.ModulePath())
+		diags = diags.Append(deprecationDiags.InConfigBody(n.Config.Config, n.Addr.String()))
+	}
+	return configVal, diags
 }

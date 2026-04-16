@@ -51,6 +51,9 @@ type NodePlannableResourceInstance struct {
 	// importTarget, if populated, contains the information necessary to plan
 	// an import of this resource.
 	importTarget importTarget
+
+	// We store a copy of the instance change for use by actions.
+	change *plans.ResourceInstanceChange
 }
 
 type importTarget struct {
@@ -409,6 +412,9 @@ func (n *NodePlannableResourceInstance) managedResourceExecute(ctx EvalContext) 
 			return diags
 		}
 
+		// keep this around for actions evaluation
+		n.change = change
+
 		if deferred == nil && planDeferred != nil {
 			deferred = planDeferred
 		}
@@ -512,6 +518,10 @@ func (n *NodePlannableResourceInstance) managedResourceExecute(ctx EvalContext) 
 			// instead of using the plan.
 			deferrals.ReportResourceInstanceDeferred(n.Addr, providers.DeferredReasonDeferredPrereq, change)
 		}
+
+		// now that the instance is planned we can plan any triggered actions
+		diags = diags.Append(n.planActionTriggers(ctx, repData))
+
 	} else {
 		// In refresh-only mode we need to evaluate the for-each expression in
 		// order to supply the value to the pre- and post-condition check
@@ -571,6 +581,157 @@ func (n *NodePlannableResourceInstance) managedResourceExecute(ctx EvalContext) 
 	}
 
 	return diags
+}
+
+func (n *NodePlannableResourceInstance) planActionTriggers(ctx EvalContext, resRepData instances.RepetitionData) tfdiags.Diagnostics {
+	var diags tfdiags.Diagnostics
+
+	for _, trigger := range n.actionTriggers {
+		scope := ctx.EvaluationScope(nil, nil, resRepData)
+		if trigger.config.Condition != nil {
+			cond, conditionEvalDiags := scope.EvalExpr(trigger.config.Condition, cty.Bool)
+			diags = diags.Append(conditionEvalDiags)
+			if diags.HasErrors() {
+				continue
+			}
+
+			if cond.IsKnown() && cond.False() {
+				// if we know the condition is going to be false, there's no need to
+				// even plan the action.
+				continue
+			}
+		}
+
+		for _, event := range actionIsTriggeredByEvent(trigger.config.Events, n.change.Action) {
+			// FIXME: setup order for apply?
+			for _, action := range trigger.actions {
+				// FIXME: need to link the action reference to the action object
+
+				diags = diags.Append(n.planActionTrigger(ctx, resRepData, action, event))
+			}
+		}
+	}
+
+	return diags
+}
+
+func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRepData instances.RepetitionData, actionRef actionRef, event configs.ActionTriggerEvent) tfdiags.Diagnostics {
+	var diags tfdiags.Diagnostics
+
+	actionBlockVal, actionDiags := actionRef.action.Eval(ctx)
+	diags = diags.Append(actionDiags)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	at := &plans.ResourceActionTrigger{
+		TriggeringResourceAddr: n.Addr,
+		// FIXME: indexes
+		ActionTriggerBlockIndex: 0,
+		ActionsListIndex:        0,
+		ActionTriggerEvent:      event,
+	}
+
+	// FIXME: marks in index value?
+	ref, evalActionDiags := evaluateActionExpression(actionRef.ref.Expr, resRepData)
+	diags = append(diags, evalActionDiags...)
+	if diags.HasErrors() {
+		return diags
+	}
+	// FIXME: check this
+	var actionInst addrs.ActionInstance
+	switch sub := ref.Subject.(type) {
+	case addrs.Action:
+		actionInst = sub.Instance(addrs.NoKey)
+	case addrs.ActionInstance:
+		actionInst = sub
+	default:
+		panic(fmt.Sprintf("unknown action type: %T", sub))
+	}
+
+	ai := &plans.ActionInvocationInstance{
+		Addr:          actionInst.Absolute(n.Addr.Module),
+		ActionTrigger: at,
+	}
+
+	var actionVal cty.Value
+	switch key := actionInst.Key.(type) {
+	case addrs.IntKey:
+		i, _ := key.Value().AsBigFloat().Int64()
+		ty := actionBlockVal.Type()
+		if ty.IsCollectionType() && actionBlockVal.LengthInt() > int(i) {
+			actionVal = actionBlockVal.Index(key.Value())
+		}
+	case addrs.StringKey:
+		str := key.Value().AsString()
+		ty := actionBlockVal.Type()
+		if ty.IsObjectType() && ty.HasAttribute(str) {
+			actionVal = actionBlockVal.GetAttr(key.Value().AsString())
+		}
+	default:
+		actionVal = actionBlockVal
+	}
+
+	if actionVal == cty.NilVal {
+		diags = diags.Append(&hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Reference to non-existent action instance",
+			Detail:   "Action instance was not found in the current context.",
+			Subject:  actionRef.ref.Expr.Range().Ptr(),
+		})
+		return diags
+	}
+
+	// FIXME: make sure index errors are checked, otherwise we panic
+
+	ai.ProviderAddr = actionRef.action.ResolvedProvider
+	ai.ConfigValue = actionVal
+
+	// FIXME Marks! sensitive, ephemeral and deprecations
+
+	provider, _, err := getProvider(ctx, ai.ProviderAddr)
+	if err != nil {
+		diags = diags.Append(&hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Failed to get provider",
+			Detail:   fmt.Sprintf("Failed to get provider: %s", err),
+			Subject:  actionRef.action.Config.DeclRange.Ptr(),
+		})
+
+		return diags
+	}
+
+	// We remove the marks for planning, we will record the sensitive values in the plans.ActionInvocationInstance
+	unmarkedConfig, _ := actionVal.UnmarkDeepWithPaths()
+
+	cc := ctx.ClientCapabilities()
+	// FIXME: deferrals in actions?
+	cc.DeferralAllowed = false
+
+	resp := provider.PlanAction(providers.PlanActionRequest{
+		ActionType:         actionRef.action.Config.Name,
+		ProposedActionData: unmarkedConfig,
+		ClientCapabilities: cc,
+	})
+
+	diags = diags.Append(resp.Diagnostics)
+	if resp.Deferred != nil {
+		// FIXME: update with deferrals decision above
+		diags = diags.Append(deferring.UnexpectedProviderDeferralDiagnostic(actionInst))
+	}
+	if resp.Diagnostics.HasErrors() {
+		return diags
+	}
+
+	ctx.Changes().AppendActionInvocation(ai)
+	return diags
+}
+
+func (n *NodePlannableResourceInstance) actionTrigger(triggeringEvent configs.ActionTriggerEvent) *plans.ResourceActionTrigger {
+	return &plans.ResourceActionTrigger{
+		TriggeringResourceAddr: n.Addr,
+		ActionTriggerEvent:     triggeringEvent,
+	}
 }
 
 // replaceTriggered checks if this instance needs to be replace due to a change
@@ -1115,20 +1276,14 @@ func actionIsTriggeredByEvent(events []configs.ActionTriggerEvent, action plans.
 		case configs.EventBeforeCreate, configs.EventAfterCreate:
 			if action.IsReplace() || action == plans.Create {
 				triggeredEvents = append(triggeredEvents, event)
-			} else {
-				continue
 			}
 		case configs.EventBeforeUpdate, configs.EventAfterUpdate:
 			if action == plans.Update {
 				triggeredEvents = append(triggeredEvents, event)
-			} else {
-				continue
 			}
 		case configs.EventBeforeDestroy, configs.EventAfterDestroy:
 			if action == plans.DeleteThenCreate || action == plans.CreateThenDelete || action == plans.Delete {
 				triggeredEvents = append(triggeredEvents, event)
-			} else {
-				continue
 			}
 		default:
 			panic(fmt.Sprintf("unknown action trigger event %s", event))

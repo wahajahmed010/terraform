@@ -137,20 +137,20 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 		if a != nil {
 			addr := a.Addr().InModule(path)
 			log.Printf("[TRACE] ConfigTransformer: Adding action %s", addr)
-			node := &NodeActionConfig{
+			abstract := &NodeActionConfig{
 				Addr:   addr,
 				Config: *a,
 			}
 
 			// FIXME: all nodes should only be NodeActionConfig, with no expansion or execution.
-			// var node dag.Vertex
-			// if f := t.ConcreteAction; f != nil {
-			// 	node = f(abstract)
-			// } else {
-			// 	node = DefaultConcreteActionNodeFunc(abstract)
-			// }
+			var node dag.Vertex
+			if f := t.ConcreteAction; f != nil {
+				node = f(abstract)
+			} else {
+				node = DefaultConcreteActionNodeFunc(abstract)
+			}
 			g.Add(node)
-			allConfigActions[addr.String()] = node
+			allConfigActions[addr.String()] = abstract
 		}
 	}
 
@@ -206,7 +206,10 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 						})
 						continue
 					}
-					triggerRef.actions = append(triggerRef.actions, actionNode)
+					triggerRef.actions = append(triggerRef.actions, actionRef{
+						ref:    action,
+						action: actionNode,
+					})
 				}
 				abstract.actionTriggers = append(abstract.actionTriggers, triggerRef)
 			}

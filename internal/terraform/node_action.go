@@ -22,14 +22,14 @@ type nodeExpandAction struct {
 }
 
 var (
-	_ GraphNodeDynamicExpandable = (*nodeExpandAction)(nil)
+// _ GraphNodeDynamicExpandable = (*nodeExpandAction)(nil)
 )
 
 func (n *nodeExpandAction) Name() string {
 	return n.Addr.String() + " (expand)"
 }
 
-func (n *nodeExpandAction) DynamicExpand(ctx EvalContext) (*Graph, tfdiags.Diagnostics) {
+func (n *nodeExpandAction) _DynamicExpand(ctx EvalContext) (*Graph, tfdiags.Diagnostics) {
 	var g Graph
 	var diags tfdiags.Diagnostics
 	expander := ctx.InstanceExpander()
@@ -48,7 +48,7 @@ func (n *nodeExpandAction) DynamicExpand(ctx EvalContext) (*Graph, tfdiags.Diagn
 			actionAddr := moduleAddr.Action(n.Addr.Action)
 
 			// And add a node to the graph for this action.
-			g.Add(&NodeActionDeclarationPartialExpanded{
+			g.Add(&UNUSED_NodeActionDeclarationPartialExpanded{
 				addr:             actionAddr,
 				config:           n.Config,
 				Schema:           n.Schema,

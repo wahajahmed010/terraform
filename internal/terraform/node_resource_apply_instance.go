@@ -266,6 +266,8 @@ func (n *NodeApplyableResourceInstance) managedResourceExecute(ctx EvalContext) 
 
 	var forEach map[string]cty.Value
 	if n.Config != nil {
+		// these diagnostics would be caught earlier, and adding them here only
+		// causes duplicates
 		forEach, _, _ = evaluateForEachExpression(n.Config.ForEach, ctx, false)
 	}
 

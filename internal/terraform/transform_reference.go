@@ -122,6 +122,14 @@ func (t *ReferenceTransformer) Transform(g *Graph) error {
 			continue
 		}
 
+		// Because actions were allowed to reference the calling resource in
+		// configuration, we need to deal with the resulting cycles. Skip action
+		// nodes in the first round so that any triggers can be connected first
+		// so cycles can be detected.
+		if _, ok := v.(*NodeActionConfig); ok {
+			continue
+		}
+
 		parents := m.References(v)
 		parentsDbg := make([]string, len(parents))
 		for i, v := range parents {
@@ -142,13 +150,26 @@ func (t *ReferenceTransformer) Transform(g *Graph) error {
 
 			if !graphNodesAreResourceInstancesInDifferentInstancesOfSameModule(v, parent) {
 				g.Connect(dag.BasicEdge(v, parent))
-			} else {
-				log.Printf("[TRACE] ReferenceTransformer: skipping %s => %s inter-module-instance dependency", dag.VertexName(v), dag.VertexName(parent))
 			}
 		}
+	}
 
-		if len(parents) > 0 {
+	// now we can go back and connect the actions
+	for _, v := range vs {
+		if _, ok := v.(*NodeActionConfig); !ok {
 			continue
+		}
+
+		// FIXME: this should still error if it's not a direct reference,
+		// because there's no valid order to evaluate the intermediary.
+		for _, referred := range m.References(v) {
+			if g.Ancestors(referred).Include(v) {
+				log.Printf("[WARN] ReferenceTransformer: skipping %s => %s due to reference cycle", dag.VertexName(v), dag.VertexName(referred))
+				continue
+			}
+
+			g.Connect(dag.BasicEdge(v, referred))
+			log.Printf("[DEBUG] ReferenceTransformer: %q references: %v", dag.VertexName(v), dag.VertexName(referred))
 		}
 	}
 

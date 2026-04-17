@@ -173,18 +173,18 @@ func (b *PlanGraphBuilder) Steps() []GraphTransformer {
 		},
 
 		// FIXME: instead of making trigger nodes, connect resources and their actions
-		&ActionTriggerConfigTransformer{
-			Config:        b.Config,
-			Operation:     b.Operation,
-			ActionTargets: b.ActionTargets,
-			queryPlanMode: b.queryPlan,
+		// &ActionTriggerConfigTransformer{
+		// 	Config:        b.Config,
+		// 	Operation:     b.Operation,
+		// 	ActionTargets: b.ActionTargets,
+		// 	queryPlanMode: b.queryPlan,
 
-			ConcreteActionTriggerNodeFunc: func(node *nodeAbstractActionTrigger, _ RelativeActionTiming) dag.Vertex {
-				return &nodeActionTriggerPlanExpand{
-					nodeAbstractActionTrigger: node,
-				}
-			},
-		},
+		// 	ConcreteActionTriggerNodeFunc: func(node *nodeAbstractActionTrigger, _ RelativeActionTiming) dag.Vertex {
+		// 		return &nodeActionTriggerPlanExpand{
+		// 			nodeAbstractActionTrigger: node,
+		// 		}
+		// 	},
+		// },
 
 		&ActionInvokePlanTransformer{
 			Config:        b.Config,

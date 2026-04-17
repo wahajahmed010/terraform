@@ -143,13 +143,14 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 			}
 
 			// FIXME: all nodes should only be NodeActionConfig, with no expansion or execution.
-			var node dag.Vertex
-			if f := t.ConcreteAction; f != nil {
-				node = f(abstract)
-			} else {
-				node = DefaultConcreteActionNodeFunc(abstract)
-			}
-			g.Add(node)
+			// var node dag.Vertex
+			// if f := t.ConcreteAction; f != nil {
+			// 	node = f(abstract)
+			// } else {
+			// 	node = DefaultConcreteActionNodeFunc(abstract)
+			// }
+			// g.Add(node)
+			g.Add(abstract)
 			allConfigActions[addr.String()] = abstract
 		}
 	}

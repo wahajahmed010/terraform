@@ -30,7 +30,7 @@ type NodeActionConfig struct {
 	Schema           *providers.ActionSchema
 	Dependencies     []addrs.ConfigResource
 
-	// TODO: cache evaluations
+	// TODO: cache evaluations?
 }
 
 var (
@@ -44,6 +44,59 @@ var (
 
 func (n NodeActionConfig) Name() string {
 	return n.Addr.String()
+}
+
+// The action config does not expand or execute itself during plan or apply, but
+// for Validate it does verify valid configuration.
+func (n *NodeActionConfig) Execute(ctx EvalContext, op walkOperation) tfdiags.Diagnostics {
+	if op != walkValidate {
+		return nil
+	}
+	return n.validate(ctx)
+}
+
+func (n *NodeActionConfig) validate(ctx EvalContext) tfdiags.Diagnostics {
+
+	var diags tfdiags.Diagnostics
+	// FIXME: count/for_each validation
+
+	if n.Config.Config == nil {
+		return nil
+	}
+
+	repData := EvalDataForNoInstanceKey
+
+	switch {
+	case n.Config.Count != nil:
+		// If the config block has count, we'll evaluate with an unknown
+		// number as count.index so we can still type check even though
+		// we won't expand count until the plan phase.
+		repData = InstanceKeyEvalData{
+			CountIndex: cty.UnknownVal(cty.Number),
+		}
+
+		// Basic type-checking of the count argument. More complete validation
+		// of this will happen when we DynamicExpand during the plan walk.
+		_, countDiags := evaluateCountExpressionValue(n.Config.Count, ctx)
+		diags = diags.Append(countDiags)
+
+	case n.Config.ForEach != nil:
+		repData = InstanceKeyEvalData{
+			EachKey:   cty.UnknownVal(cty.String),
+			EachValue: cty.UnknownVal(cty.DynamicPseudoType),
+		}
+
+		// Evaluate the for_each expression here so we can expose the diagnostics
+		forEachDiags := newForEachEvaluator(n.Config.ForEach, ctx, false).ValidateResourceValue()
+		diags = diags.Append(forEachDiags)
+	}
+
+	_, valDiags := n.evalInstance(ctx, repData)
+	diags = diags.Append(valDiags)
+	if valDiags.HasErrors() {
+		return diags
+	}
+	return diags
 }
 
 // ConcreteActionNodeFunc is a callback type used to convert an
@@ -65,6 +118,12 @@ func (n NodeActionConfig) ActionAddr() addrs.ConfigAction {
 
 func (n NodeActionConfig) ModulePath() addrs.Module {
 	return n.Addr.Module
+}
+
+func (n *NodeActionConfig) Path() addrs.ModuleInstance {
+	// this node is only directly evaluated during validation, so there is never
+	// module expansion.
+	return n.Addr.Module.UnkeyedInstanceShim()
 }
 
 func (n *NodeActionConfig) ReferenceableAddrs() []addrs.Referenceable {
@@ -169,8 +228,6 @@ func (n *NodeActionConfig) repetitionData(ctx EvalContext) ([]instances.Repetiti
 func (n *NodeActionConfig) Eval(ctx EvalContext) (cty.Value, tfdiags.Diagnostics) {
 	var diags tfdiags.Diagnostics
 
-	// FIXME: deferrals?
-
 	// This should have been caught already
 	if n.Schema == nil {
 		panic("action eval called without a schema")
@@ -215,8 +272,8 @@ func (n *NodeActionConfig) Eval(ctx EvalContext) (cty.Value, tfdiags.Diagnostics
 }
 
 func (n *NodeActionConfig) evalInstance(ctx EvalContext, repData instances.RepetitionData) (cty.Value, tfdiags.Diagnostics) {
-
 	var diags tfdiags.Diagnostics
+
 	configVal := cty.NullVal(n.Schema.ConfigSchema.ImpliedType())
 	if n.Config.Config != nil {
 		var configDiags tfdiags.Diagnostics

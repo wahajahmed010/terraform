@@ -255,6 +255,7 @@ func (n *NodePlannableResourceInstance) managedResourceExecute(ctx EvalContext) 
 						},
 					},
 				})
+				// can't have actions to defer if there's no config to trigger them
 				return diags
 			}
 		}
@@ -372,7 +373,6 @@ func (n *NodePlannableResourceInstance) managedResourceExecute(ctx EvalContext) 
 
 	// Plan the instance, unless we're in the refresh-only mode
 	if !n.skipPlanChanges {
-
 		// add this instance to n.forceReplace if replacement is triggered by
 		// another change
 		diags = diags.Append(n.replaceTriggered(ctx, repData))
@@ -444,6 +444,8 @@ func (n *NodePlannableResourceInstance) managedResourceExecute(ctx EvalContext) 
 			// refresh or planning stage. We'll report the deferral and
 			// store what we could produce in the deferral tracker.
 			deferrals.ReportResourceInstanceDeferred(addr, deferred.Reason, change)
+			n.reportDeferredActionTriggers(ctx, providers.DeferredReasonDeferredPrereq)
+
 		} else if !deferrals.ShouldDeferResourceInstanceChanges(n.Addr, n.Dependencies) {
 			// We intentionally write the change before the subsequent checks, because
 			// all of the checks below this point are for problems caused by the
@@ -517,9 +519,11 @@ func (n *NodePlannableResourceInstance) managedResourceExecute(ctx EvalContext) 
 			// value registered here as the value of this resource instance,
 			// instead of using the plan.
 			deferrals.ReportResourceInstanceDeferred(n.Addr, providers.DeferredReasonDeferredPrereq, change)
+			n.reportDeferredActionTriggers(ctx, providers.DeferredReasonDeferredPrereq)
 		}
 
-		// now that the instance is planned we can plan any triggered actions
+		// now that the instance is planned we can plan any triggered actions if we weren't deferred
+		// FIXME: the deferral logic is too confusing. this whole method is too confusing
 		diags = diags.Append(n.planActionTriggers(ctx, repData))
 
 	} else {
@@ -577,14 +581,45 @@ func (n *NodePlannableResourceInstance) managedResourceExecute(ctx EvalContext) 
 					After:  instanceRefreshState.Value,
 				},
 			})
+			n.reportDeferredActionTriggers(ctx, deferred.Reason)
 		}
 	}
 
 	return diags
 }
 
+func (n *NodePlannableResourceInstance) reportDeferredActionTriggers(ctx EvalContext, reason providers.DeferredReason) {
+	deferrals := ctx.Deferrals()
+
+	// FIXME: if the resource is being deferred, we don't even know what the
+	// event is regardless of what the deferral claims, because an update could
+	// instead result in a create, destroy, or noop events.
+	for _, trigger := range n.actionTriggers {
+		for _, action := range trigger.actions {
+			deferrals.ReportActionInvocationDeferred(plans.ActionInvocationInstance{
+				// FIXME: actions don't expand with modules, so this address
+				// isn't really representative of the real address.
+				//
+				// FIXME x2: we may or may not be able to expand the referenced
+				// instance depending on the deferral, so how should deferrals
+				// handle that?
+				Addr: action.action.Addr.Absolute(n.Addr.Module).Instance(addrs.NoKey),
+				ActionTrigger: &plans.ResourceActionTrigger{
+					TriggeringResourceAddr: n.Addr,
+				},
+			}, reason)
+		}
+	}
+}
+
 func (n *NodePlannableResourceInstance) planActionTriggers(ctx EvalContext, resRepData instances.RepetitionData) tfdiags.Diagnostics {
 	var diags tfdiags.Diagnostics
+
+	// check if our containing resource was deferred
+	_, deferred := ctx.Deferrals().GetDeferredResourceInstanceValue(n.Addr)
+	if deferred {
+		return nil
+	}
 
 	for _, trigger := range n.actionTriggers {
 		scope := ctx.EvaluationScope(nil, nil, resRepData)
@@ -617,7 +652,6 @@ func (n *NodePlannableResourceInstance) planActionTriggers(ctx EvalContext, resR
 
 func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRepData instances.RepetitionData, actionRef actionRef, event configs.ActionTriggerEvent) tfdiags.Diagnostics {
 	var diags tfdiags.Diagnostics
-
 	actionBlockVal, actionDiags := actionRef.action.Eval(ctx)
 	diags = diags.Append(actionDiags)
 	if diags.HasErrors() {
@@ -649,17 +683,12 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 		panic(fmt.Sprintf("unknown action type: %T", sub))
 	}
 
-	ai := &plans.ActionInvocationInstance{
-		Addr:          actionInst.Absolute(n.Addr.Module),
-		ActionTrigger: at,
-	}
-
 	var actionVal cty.Value
 	switch key := actionInst.Key.(type) {
 	case addrs.IntKey:
 		i, _ := key.Value().AsBigFloat().Int64()
 		ty := actionBlockVal.Type()
-		if ty.IsCollectionType() && actionBlockVal.LengthInt() > int(i) {
+		if ty.IsTupleType() && actionBlockVal.LengthInt() > int(i) {
 			actionVal = actionBlockVal.Index(key.Value())
 		}
 	case addrs.StringKey:
@@ -684,12 +713,9 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 
 	// FIXME: make sure index errors are checked, otherwise we panic
 
-	ai.ProviderAddr = actionRef.action.ResolvedProvider
-	ai.ConfigValue = actionVal
-
 	// FIXME Marks! sensitive, ephemeral and deprecations
 
-	provider, _, err := getProvider(ctx, ai.ProviderAddr)
+	provider, _, err := getProvider(ctx, actionRef.action.ResolvedProvider)
 	if err != nil {
 		diags = diags.Append(&hcl.Diagnostic{
 			Severity: hcl.DiagError,
@@ -714,24 +740,51 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 		ClientCapabilities: cc,
 	})
 
-	diags = diags.Append(resp.Diagnostics)
+	// FIXME: config body is not the entire action config block
+	// Our diagnostics expect to be associated with a config body, but we may not have one due to the structure of actions.
+	if actionRef.action.Config.Config != nil {
+		resp.Diagnostics = resp.Diagnostics.InConfigBody(actionRef.action.Config.Config, actionRef.action.Addr.String())
+	}
+
+	// FIXME: this diagnostic handling is incorrect, but it matches
+	// the existing implementation for now
+	if len(resp.Diagnostics) > 0 {
+		severity := hcl.DiagWarning
+		message := "Warnings when planning action"
+		err := resp.Diagnostics.Warnings().ErrWithWarnings()
+		if resp.Diagnostics.HasErrors() {
+			severity = hcl.DiagError
+			message = "Failed to plan action"
+			err = resp.Diagnostics.ErrWithWarnings()
+		}
+
+		diags = diags.Append(&hcl.Diagnostic{
+			Severity: severity,
+			Summary:  message,
+			Detail:   err.Error(),
+			Subject:  actionRef.ref.Range.Ptr(),
+		})
+	}
+
 	if resp.Deferred != nil {
-		// FIXME: update with deferrals decision above
+		// FIXME: We can't apply the resource change and defer an action,
+		// because there won't ever be a future event to retrigger the deferred
+		// action. Should we remove Deferred altogether?
 		diags = diags.Append(deferring.UnexpectedProviderDeferralDiagnostic(actionInst))
 	}
 	if resp.Diagnostics.HasErrors() {
 		return diags
 	}
 
+	ai := &plans.ActionInvocationInstance{
+		Addr:          actionInst.Absolute(n.Addr.Module),
+		ActionTrigger: at,
+		ConfigValue:   ephemeral.RemoveEphemeralValues(actionVal),
+		ProviderAddr:  actionRef.action.ResolvedProvider,
+	}
+
 	ctx.Changes().AppendActionInvocation(ai)
 	return diags
-}
-
-func (n *NodePlannableResourceInstance) actionTrigger(triggeringEvent configs.ActionTriggerEvent) *plans.ResourceActionTrigger {
-	return &plans.ResourceActionTrigger{
-		TriggeringResourceAddr: n.Addr,
-		ActionTriggerEvent:     triggeringEvent,
-	}
 }
 
 // replaceTriggered checks if this instance needs to be replace due to a change

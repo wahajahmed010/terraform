@@ -146,7 +146,7 @@ func (t *ProviderTransformer) Transform(g *Graph) error {
 	requested := map[dag.Vertex]map[string]ProviderRef{}
 	needConfigured := map[string]addrs.AbsProviderConfig{}
 
-	// forActions stored provider used only for actions by a resource. These are
+	// forActions stores provider used only for actions by a resource. These are
 	// only to connect the resource to the correct nodes, and are not for
 	// resolution of the resource's own provider.
 	forActions := map[dag.Vertex]map[string]ProviderRef{}
@@ -259,20 +259,23 @@ func (t *ProviderTransformer) Transform(g *Graph) error {
 	// GraphNodeProviderConsumer as resources, so this is only taking care of
 	// connecting triggers to the action providers to make sure the ordering is
 	// correct.
-	for v, refs := range forActions {
-		for key, ref := range refs {
-			target := m[key]
-			if target == nil {
-				// No target and no path to traverse up from
-				diags = diags.Append(fmt.Errorf("%s: action provider %s couldn't be found", dag.VertexName(v), ref.AbsProviderConfig()))
-				continue
-			}
 
-			log.Printf("[DEBUG] ProviderTransformer: connecting %s to action provider %s", dag.VertexName(v), ref.AbsProviderConfig())
-			g.Connect(dag.BasicEdge(v, target))
+	// FIXME: Plan doesn't need this because we have the action nodes to resolve
+	// the action providers now, but do we need that for apply?
+	//
+	// for v, refs := range forActions {
+	//  for key, ref := range refs {
+	//      target := m[key]
+	//      if target == nil {
+	//          // No target and no path to traverse up from
+	//          diags = diags.Append(fmt.Errorf("%s: action provider %s couldn't be found", dag.VertexName(v), ref.AbsProviderConfig()))
+	//          continue
+	//      }
 
-		}
-	}
+	// 		log.Printf("[DEBUG] ProviderTransformer: connecting %s to action provider %s", dag.VertexName(v), ref.AbsProviderConfig())
+	// 		g.Connect(dag.BasicEdge(v, target))
+	// 	}
+	// }
 
 	return diags.Err()
 }

@@ -735,7 +735,7 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 	cc.DeferralAllowed = false
 
 	resp := provider.PlanAction(providers.PlanActionRequest{
-		ActionType:         actionRef.action.Config.Name,
+		ActionType:         actionRef.action.Addr.Action.Type,
 		ProposedActionData: unmarkedConfig,
 		ClientCapabilities: cc,
 	})

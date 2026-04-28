@@ -35,6 +35,9 @@ type NodeApplyableResourceInstance struct {
 	// forceReplace indicates that this resource is being replaced for external
 	// reasons, like a -replace flag or via replace_triggered_by.
 	forceReplace bool
+
+	// FIXME: not a node
+	actionTriggers []*nodeActionTriggerApplyInstance
 }
 
 var (

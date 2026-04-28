@@ -20,6 +20,9 @@ import (
 // destroyed.
 type NodeDestroyResourceInstance struct {
 	*NodeAbstractResourceInstance
+
+	// FIXME: not a node
+	actionTriggers []*nodeActionTriggerApplyInstance
 }
 
 var (

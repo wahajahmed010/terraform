@@ -3014,8 +3014,8 @@ action "test_action" "one" {
 						t.Errorf("expected exactly one diagnostic but got %d", len(diagnostics))
 					}
 
-					if diagnostics[0].Description().Summary != "Partially applied configuration" {
-						t.Errorf("wrong diagnostic: %s", diagnostics[0].Description().Summary)
+					if len(diagnostics) < 1 || diagnostics[0].Description().Summary != "Partially applied configuration" {
+						t.Errorf("wrong diagnostic: %v", diagnostics.Err())
 					}
 				},
 			},
@@ -3246,9 +3246,10 @@ resource "test_object" "a" {
 
 				assertPlanDiagnostics: func(t *testing.T, diags tfdiags.Diagnostics) {
 					if !diags.HasErrors() {
-						t.Errorf("expected errors, got none")
+						t.Fatalf("expected errors, got none")
 					}
 
+					// FIXME: need better than a cycle error here
 					err := diags.Err().Error()
 					if !strings.Contains(err, "Cycle:") || !strings.Contains(err, "action.test_action.hello") || !strings.Contains(err, "test_object.a") {
 						t.Fatalf("Expected '[Error] Cycle: action.test_action.hello (instance), test_object.a', got '%s'", err)

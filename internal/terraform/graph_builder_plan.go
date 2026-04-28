@@ -163,28 +163,13 @@ func (b *PlanGraphBuilder) Steps() []GraphTransformer {
 		// Creates all the resources represented in the config
 		&ConfigTransformer{
 			Concrete: b.ConcreteResource,
-			// ConcreteAction: b.ConcreteAction,
-			Config:  b.Config,
-			destroy: b.Operation == walkDestroy || b.Operation == walkPlanDestroy,
+			Config:   b.Config,
+			destroy:  b.Operation == walkDestroy || b.Operation == walkPlanDestroy,
 
 			importTargets: b.ImportTargets,
 
 			generateConfigPathForImportTargets: b.GenerateConfigPath,
 		},
-
-		// FIXME: instead of making trigger nodes, connect resources and their actions
-		// &ActionTriggerConfigTransformer{
-		// 	Config:        b.Config,
-		// 	Operation:     b.Operation,
-		// 	ActionTargets: b.ActionTargets,
-		// 	queryPlanMode: b.queryPlan,
-
-		// 	ConcreteActionTriggerNodeFunc: func(node *nodeAbstractActionTrigger, _ RelativeActionTiming) dag.Vertex {
-		// 		return &nodeActionTriggerPlanExpand{
-		// 			nodeAbstractActionTrigger: node,
-		// 		}
-		// 	},
-		// },
 
 		&ActionInvokePlanTransformer{
 			Config:        b.Config,

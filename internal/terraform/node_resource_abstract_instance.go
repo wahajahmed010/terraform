@@ -53,6 +53,8 @@ type NodeAbstractResourceInstance struct {
 
 	// override is set by the graph itself, just before this node executes.
 	override *configs.Override
+
+	actionTriggers []*planResourceActionTrigger
 }
 
 var (

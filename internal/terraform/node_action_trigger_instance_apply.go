@@ -23,6 +23,10 @@ type nodeActionTriggerApplyInstance struct {
 	resolvedProvider   addrs.AbsProviderConfig
 	ActionTriggerRange *hcl.Range
 	ConditionExpr      hcl.Expression
+
+	// link the trigger to it's action config
+	// this is connected by the diff transformer
+	actionConfig *NodeActionConfig
 }
 
 var (

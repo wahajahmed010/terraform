@@ -142,14 +142,6 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 				Config: *a,
 			}
 
-			// FIXME: all nodes should only be NodeActionConfig, with no expansion or execution.
-			// var node dag.Vertex
-			// if f := t.ConcreteAction; f != nil {
-			// 	node = f(abstract)
-			// } else {
-			// 	node = DefaultConcreteActionNodeFunc(abstract)
-			// }
-			// g.Add(node)
 			g.Add(abstract)
 			allConfigActions[addr.String()] = abstract
 		}
@@ -166,7 +158,7 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 		var diags tfdiags.Diagnostics
 		if r.Managed != nil && r.Managed.ActionTriggers != nil {
 			for _, at := range r.Managed.ActionTriggers {
-				triggerRef := &resourceActionTrigger{
+				triggerRef := &planResourceActionTrigger{
 					config: at,
 				}
 				for _, action := range at.Actions {

@@ -56,6 +56,8 @@ var (
 
 // ResourceActionTrigger contains the action trigger configuration from the resource.
 type ResourceActionTrigger struct {
+	// FIXME: how do we indicate an unknown condition?
+
 	TriggeringResourceAddr addrs.AbsResourceInstance
 	// Information about the trigger
 	// The event that triggered this action invocation.

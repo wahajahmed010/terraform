@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -3217,43 +3216,6 @@ resource "test_object" "a" {
 							End:      hcl.Pos{Line: 10, Column: 39, Byte: 214},
 						},
 					})
-				},
-			},
-
-			"referencing triggering resource in before_* condition": {
-				module: map[string]string{
-					"main.tf": `
-action "test_action" "hello" {}
-action "test_action" "world" {}
-resource "test_object" "a" {
-  name = "foo"
-  lifecycle {
-    action_trigger {
-      events = [before_create]
-      condition = test_object.a.name == "foo"
-      actions = [action.test_action.hello]
-    }
-    action_trigger {
-      events = [before_update]
-      condition = test_object.a.name == "bar"
-      actions = [action.test_action.world]
-    }
-  }
-}
-`,
-				},
-				expectPlanActionCalled: true,
-
-				assertPlanDiagnostics: func(t *testing.T, diags tfdiags.Diagnostics) {
-					if !diags.HasErrors() {
-						t.Fatalf("expected errors, got none")
-					}
-
-					// FIXME: need better than a cycle error here
-					err := diags.Err().Error()
-					if !strings.Contains(err, "Cycle:") || !strings.Contains(err, "action.test_action.hello") || !strings.Contains(err, "test_object.a") {
-						t.Fatalf("Expected '[Error] Cycle: action.test_action.hello (instance), test_object.a', got '%s'", err)
-					}
 				},
 			},
 

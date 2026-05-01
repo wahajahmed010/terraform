@@ -18,7 +18,9 @@ import (
 // primarily concerned with resolving provider references and receiving the
 // correct schema. All expansion and execution is done from an action trigger.
 type NodeActionConfig struct {
-	Addr   addrs.ConfigAction
+	Addr addrs.ConfigAction
+
+	// FIXME: pointer for consistency
 	Config configs.Action
 
 	// The fields below will be automatically set using the Attach interfaces if
@@ -225,6 +227,7 @@ func (n *NodeActionConfig) repetitionData(ctx EvalContext) ([]instances.Repetiti
 }
 
 // Eval returns the value of the expanded config block.
+// FIXME: better instance handling, as opposed to dealing with this like normal evaluation
 func (n *NodeActionConfig) Eval(ctx EvalContext) (cty.Value, tfdiags.Diagnostics) {
 	var diags tfdiags.Diagnostics
 

@@ -105,14 +105,6 @@ func (n *NodeActionConfig) validate(ctx EvalContext) tfdiags.Diagnostics {
 // abstract action to a concrete one of some type.
 type ConcreteActionNodeFunc func(*NodeActionConfig) dag.Vertex
 
-// DefaultConcreteActionNodeFunc is the default ConcreteActionNodeFunc used by
-// everything except validate.
-func DefaultConcreteActionNodeFunc(a *NodeActionConfig) dag.Vertex {
-	return &nodeExpandAction{
-		NodeActionConfig: a,
-	}
-}
-
 // GraphNodeConfigAction
 func (n NodeActionConfig) ActionAddr() addrs.ConfigAction {
 	return n.Addr

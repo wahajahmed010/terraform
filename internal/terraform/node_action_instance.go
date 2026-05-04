@@ -41,6 +41,7 @@ func (n *NodeAbstractActionInstance) Path() addrs.ModuleInstance {
 	return n.Addr.Module
 }
 
+// TODO: remove this but cross-check with new impl
 func (n *NodeAbstractActionInstance) Execute(ctx EvalContext, _ walkOperation) tfdiags.Diagnostics {
 	var diags tfdiags.Diagnostics
 
@@ -80,7 +81,7 @@ func (n *NodeAbstractActionInstance) Execute(ctx EvalContext, _ walkOperation) t
 		}
 	}
 
-	ctx.Actions().AddActionInstance(n.Addr, configVal, n.ResolvedProvider)
+	// ctx.Actions().AddActionInstance(n.Addr, configVal, n.ResolvedProvider)
 	return diags
 }
 

@@ -10,8 +10,6 @@ import (
 
 	"github.com/hashicorp/terraform/internal/addrs"
 	"github.com/hashicorp/terraform/internal/configs"
-	"github.com/hashicorp/terraform/internal/plans"
-	"github.com/hashicorp/terraform/internal/providers"
 	"github.com/hashicorp/terraform/internal/tfdiags"
 )
 
@@ -72,7 +70,6 @@ func (n *NodeActionTriggerPartialExpanded) ActionAddr() addrs.ConfigAction {
 
 // Execute implements GraphNodeExecutable.
 func (n *NodeActionTriggerPartialExpanded) Execute(ctx EvalContext, op walkOperation) tfdiags.Diagnostics {
-	var diags tfdiags.Diagnostics
 	// We know that if the action is partially expanded, the triggering resource must also be partially expanded.
 	partialResourceChange := ctx.Deferrals().GetDeferredPartialExpandedResource(n.lifecycleActionTrigger.resourceAddress)
 	if partialResourceChange == nil {
@@ -84,49 +81,51 @@ func (n *NodeActionTriggerPartialExpanded) Execute(ctx EvalContext, op walkOpera
 		return nil
 	}
 
-	actionInstance, ok := ctx.Actions().GetPartialExpandedAction(n.addr)
-	if !ok {
-		panic("action is nil")
-	}
+	/*
+		actionInstance, ok := ctx.Actions().GetPartialExpandedAction(n.addr)
+		if !ok {
+			panic("action is nil")
+		}
 
-	provider, _, err := getProvider(ctx, actionInstance.ProviderAddr)
-	if err != nil {
-		diags = diags.Append(&hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Failed to get provider",
-			Detail:   fmt.Sprintf("Failed to get provider: %s", err),
-			Subject:  n.lifecycleActionTrigger.invokingSubject,
+		provider, _, err := getProvider(ctx, actionInstance.ProviderAddr)
+		if err != nil {
+			diags = diags.Append(&hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  "Failed to get provider",
+				Detail:   fmt.Sprintf("Failed to get provider: %s", err),
+				Subject:  n.lifecycleActionTrigger.invokingSubject,
+			})
+
+			return diags
+		}
+
+		// We remove the marks for planning, we will record the sensitive values in the plans.ActionInvocationInstance
+		unmarkedConfig, _ := actionInstance.ConfigValue.UnmarkDeepWithPaths()
+
+		resp := provider.PlanAction(providers.PlanActionRequest{
+			ActionType:         n.addr.ConfigAction().Action.Type,
+			ProposedActionData: unmarkedConfig,
+			ClientCapabilities: ctx.ClientCapabilities(),
 		})
 
-		return diags
-	}
+		if resp.Diagnostics.HasErrors() {
+			diags = diags.Append(resp.Diagnostics)
+			return diags
+		}
 
-	// We remove the marks for planning, we will record the sensitive values in the plans.ActionInvocationInstance
-	unmarkedConfig, _ := actionInstance.ConfigValue.UnmarkDeepWithPaths()
-
-	resp := provider.PlanAction(providers.PlanActionRequest{
-		ActionType:         n.addr.ConfigAction().Action.Type,
-		ProposedActionData: unmarkedConfig,
-		ClientCapabilities: ctx.ClientCapabilities(),
-	})
-
-	if resp.Diagnostics.HasErrors() {
-		diags = diags.Append(resp.Diagnostics)
-		return diags
-	}
-
-	for _, triggeringEvent := range triggeringEvents {
-		ctx.Deferrals().ReportActionInvocationDeferred(plans.ActionInvocationInstance{
-			Addr:         n.addr.UnknownActionInstance(),
-			ProviderAddr: n.resolvedProvider,
-			ActionTrigger: &plans.ResourceActionTrigger{
-				TriggeringResourceAddr:  n.lifecycleActionTrigger.resourceAddress.UnknownResourceInstance(),
-				ActionTriggerEvent:      triggeringEvent,
-				ActionTriggerBlockIndex: n.lifecycleActionTrigger.actionTriggerBlockIndex,
-				ActionsListIndex:        n.lifecycleActionTrigger.actionListIndex,
-			},
-			ConfigValue: actionInstance.ConfigValue,
-		}, providers.DeferredReasonInstanceCountUnknown)
-	}
+		for _, triggeringEvent := range triggeringEvents {
+			ctx.Deferrals().ReportActionInvocationDeferred(plans.ActionInvocationInstance{
+				Addr:         n.addr.UnknownActionInstance(),
+				ProviderAddr: n.resolvedProvider,
+				ActionTrigger: &plans.ResourceActionTrigger{
+					TriggeringResourceAddr:  n.lifecycleActionTrigger.resourceAddress.UnknownResourceInstance(),
+					ActionTriggerEvent:      triggeringEvent,
+					ActionTriggerBlockIndex: n.lifecycleActionTrigger.actionTriggerBlockIndex,
+					ActionsListIndex:        n.lifecycleActionTrigger.actionListIndex,
+				},
+				ConfigValue: actionInstance.ConfigValue,
+			}, providers.DeferredReasonInstanceCountUnknown)
+		}
+	*/
 	return nil
 }

@@ -75,6 +75,7 @@ func (n *UNUSED_NodeActionDeclarationPartialExpanded) Execute(ctx EvalContext, o
 			return diags
 		}
 	}
-	ctx.Actions().AddPartialExpandedAction(n.addr, configVal, n.resolvedProvider)
+	// FIXME
+	// ctx.Actions().AddPartialExpandedAction(n.addr, configVal, n.resolvedProvider)
 	return nil
 }

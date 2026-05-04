@@ -12,10 +12,8 @@ import (
 	"github.com/hashicorp/terraform/internal/addrs"
 	"github.com/hashicorp/terraform/internal/configs"
 	"github.com/hashicorp/terraform/internal/instances"
-	"github.com/hashicorp/terraform/internal/lang/ephemeral"
 	"github.com/hashicorp/terraform/internal/lang/langrefs"
 	"github.com/hashicorp/terraform/internal/plans"
-	"github.com/hashicorp/terraform/internal/plans/deferring"
 	"github.com/hashicorp/terraform/internal/providers"
 	"github.com/hashicorp/terraform/internal/tfdiags"
 )
@@ -102,101 +100,103 @@ func (n *nodeActionTriggerPlanInstance) Execute(ctx EvalContext, operation walkO
 		panic("Only actions triggered by plan and apply are supported")
 	}
 
-	actionInstance, ok := ctx.Actions().GetActionInstance(n.actionAddress)
-	if !ok {
-		diags = diags.Append(&hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Reference to non-existent action instance",
-			Detail:   "Action instance was not found in the current context.",
-			Subject:  n.lifecycleActionTrigger.invokingSubject,
-		})
-		return diags
-	}
-	ai.ProviderAddr = actionInstance.ProviderAddr
-	// with resources, the provider would be expected to strip the ephemeral
-	// values out. with actions, we don't get the value back from the
-	// provider so we'll do that ourselves now.
-	ai.ConfigValue = ephemeral.RemoveEphemeralValues(actionInstance.ConfigValue)
-
-	triggeredEvents := actionIsTriggeredByEvent(n.lifecycleActionTrigger.events, change.Action)
-	if len(triggeredEvents) == 0 {
-		return diags
-	}
-
-	// Evaluate the condition expression if it exists (otherwise it's true)
-	if n.lifecycleActionTrigger.conditionExpr != nil {
-		condition, conditionDiags := evaluateActionCondition(ctx, actionConditionContext{
-			events:          n.lifecycleActionTrigger.events,
-			conditionExpr:   n.lifecycleActionTrigger.conditionExpr,
-			resourceAddress: n.lifecycleActionTrigger.resourceAddress,
-		})
-		diags = diags.Append(conditionDiags)
-		if conditionDiags.HasErrors() {
-			return conditionDiags
-		}
-
-		// The condition is false so we skip the action
-		if !condition {
+	/*
+		actionInstance, ok := ctx.Actions().GetActionInstance(n.actionAddress)
+		if !ok {
+			diags = diags.Append(&hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  "Reference to non-existent action instance",
+				Detail:   "Action instance was not found in the current context.",
+				Subject:  n.lifecycleActionTrigger.invokingSubject,
+			})
 			return diags
 		}
-	}
+		ai.ProviderAddr = actionInstance.ProviderAddr
+		// with resources, the provider would be expected to strip the ephemeral
+		// values out. with actions, we don't get the value back from the
+		// provider so we'll do that ourselves now.
+		ai.ConfigValue = ephemeral.RemoveEphemeralValues(actionInstance.ConfigValue)
 
-	provider, _, err := getProvider(ctx, actionInstance.ProviderAddr)
-	if err != nil {
-		diags = diags.Append(&hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Failed to get provider",
-			Detail:   fmt.Sprintf("Failed to get provider: %s", err),
-			Subject:  n.lifecycleActionTrigger.invokingSubject,
-		})
-
-		return diags
-	}
-
-	// We remove the marks for planning, we will record the sensitive values in the plans.ActionInvocationInstance
-	unmarkedConfig, _ := actionInstance.ConfigValue.UnmarkDeepWithPaths()
-
-	cc := ctx.ClientCapabilities()
-	cc.DeferralAllowed = false // for now, deferrals in actions are always disabled
-	resp := provider.PlanAction(providers.PlanActionRequest{
-		ActionType:         n.actionAddress.Action.Action.Type,
-		ProposedActionData: unmarkedConfig,
-		ClientCapabilities: cc,
-	})
-
-	if len(resp.Diagnostics) > 0 {
-		severity := hcl.DiagWarning
-		message := "Warnings when planning action"
-		err := resp.Diagnostics.Warnings().ErrWithWarnings()
-		if resp.Diagnostics.HasErrors() {
-			severity = hcl.DiagError
-			message = "Failed to plan action"
-			err = resp.Diagnostics.ErrWithWarnings()
+		triggeredEvents := actionIsTriggeredByEvent(n.lifecycleActionTrigger.events, change.Action)
+		if len(triggeredEvents) == 0 {
+			return diags
 		}
 
-		diags = diags.Append(&hcl.Diagnostic{
-			Severity: severity,
-			Summary:  message,
-			Detail:   err.Error(),
-			Subject:  n.lifecycleActionTrigger.invokingSubject,
-		})
-	}
-	if resp.Deferred != nil {
-		// we always set allow_deferrals to be false for actions, so this
-		// should not happen
-		diags = diags.Append(deferring.UnexpectedProviderDeferralDiagnostic(n.actionAddress))
-	}
-	if resp.Diagnostics.HasErrors() {
-		return diags
-	}
+		// Evaluate the condition expression if it exists (otherwise it's true)
+		if n.lifecycleActionTrigger.conditionExpr != nil {
+			condition, conditionDiags := evaluateActionCondition(ctx, actionConditionContext{
+				events:          n.lifecycleActionTrigger.events,
+				conditionExpr:   n.lifecycleActionTrigger.conditionExpr,
+				resourceAddress: n.lifecycleActionTrigger.resourceAddress,
+			})
+			diags = diags.Append(conditionDiags)
+			if conditionDiags.HasErrors() {
+				return conditionDiags
+			}
 
-	// We are planning to run this action multiple times so
-	for _, triggeredEvent := range triggeredEvents {
-		eventSpecificAi := ai.DeepCopy()
-		// We need to set the triggering event on the action invocation
-		eventSpecificAi.ActionTrigger = n.lifecycleActionTrigger.ActionTrigger(triggeredEvent)
-		ctx.Changes().AppendActionInvocation(eventSpecificAi)
-	}
+			// The condition is false so we skip the action
+			if !condition {
+				return diags
+			}
+		}
+
+		provider, _, err := getProvider(ctx, actionInstance.ProviderAddr)
+		if err != nil {
+			diags = diags.Append(&hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  "Failed to get provider",
+				Detail:   fmt.Sprintf("Failed to get provider: %s", err),
+				Subject:  n.lifecycleActionTrigger.invokingSubject,
+			})
+
+			return diags
+		}
+
+		// We remove the marks for planning, we will record the sensitive values in the plans.ActionInvocationInstance
+		unmarkedConfig, _ := actionInstance.ConfigValue.UnmarkDeepWithPaths()
+
+		cc := ctx.ClientCapabilities()
+		cc.DeferralAllowed = false // for now, deferrals in actions are always disabled
+		resp := provider.PlanAction(providers.PlanActionRequest{
+			ActionType:         n.actionAddress.Action.Action.Type,
+			ProposedActionData: unmarkedConfig,
+			ClientCapabilities: cc,
+		})
+
+		if len(resp.Diagnostics) > 0 {
+			severity := hcl.DiagWarning
+			message := "Warnings when planning action"
+			err := resp.Diagnostics.Warnings().ErrWithWarnings()
+			if resp.Diagnostics.HasErrors() {
+				severity = hcl.DiagError
+				message = "Failed to plan action"
+				err = resp.Diagnostics.ErrWithWarnings()
+			}
+
+			diags = diags.Append(&hcl.Diagnostic{
+				Severity: severity,
+				Summary:  message,
+				Detail:   err.Error(),
+				Subject:  n.lifecycleActionTrigger.invokingSubject,
+			})
+		}
+		if resp.Deferred != nil {
+			// we always set allow_deferrals to be false for actions, so this
+			// should not happen
+			diags = diags.Append(deferring.UnexpectedProviderDeferralDiagnostic(n.actionAddress))
+		}
+		if resp.Diagnostics.HasErrors() {
+			return diags
+		}
+
+		// We are planning to run this action multiple times so
+		for _, triggeredEvent := range triggeredEvents {
+			eventSpecificAi := ai.DeepCopy()
+			// We need to set the triggering event on the action invocation
+			eventSpecificAi.ActionTrigger = n.lifecycleActionTrigger.ActionTrigger(triggeredEvent)
+			ctx.Changes().AppendActionInvocation(eventSpecificAi)
+		}
+	*/
 	return diags
 }
 

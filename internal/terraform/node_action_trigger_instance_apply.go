@@ -10,19 +10,20 @@ import (
 
 	"github.com/hashicorp/terraform/internal/addrs"
 	"github.com/hashicorp/terraform/internal/configs"
-	"github.com/hashicorp/terraform/internal/lang/ephemeral"
 	"github.com/hashicorp/terraform/internal/lang/langrefs"
 	"github.com/hashicorp/terraform/internal/plans"
-	"github.com/hashicorp/terraform/internal/plans/objchange"
 	"github.com/hashicorp/terraform/internal/providers"
 	"github.com/hashicorp/terraform/internal/tfdiags"
 )
 
 type nodeActionTriggerApplyInstance struct {
-	ActionInvocation   *plans.ActionInvocationInstanceSrc
-	resolvedProvider   addrs.AbsProviderConfig
+	ActionInvocation *plans.ActionInvocationInstanceSrc
+	resolvedProvider addrs.AbsProviderConfig
+
+	// FIXME: this is no longer populated
 	ActionTriggerRange *hcl.Range
-	ConditionExpr      hcl.Expression
+
+	ConditionExpr hcl.Expression
 
 	// link the trigger to it's action config
 	// this is connected by the diff transformer
@@ -69,75 +70,77 @@ func (n *nodeActionTriggerApplyInstance) Execute(ctx EvalContext, wo walkOperati
 		}
 	}
 
-	ai := ctx.Changes().GetActionInvocation(actionInvocation.Addr, actionInvocation.ActionTrigger)
-	if ai == nil {
-		diags = diags.Append(&hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Action invocation not found in plan",
-			Detail:   "Could not find action invocation for address " + actionInvocation.Addr.String(),
-			Subject:  n.ActionTriggerRange,
-		})
-		return diags
-	}
-	actionData, ok := ctx.Actions().GetActionInstance(ai.Addr)
-	if !ok {
-		diags = diags.Append(&hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Action instance not found",
-			Detail:   "Could not find action instance for address " + ai.Addr.String(),
-			Subject:  n.ActionTriggerRange,
-		})
-		return diags
-	}
-	provider, schema, err := getProvider(ctx, actionData.ProviderAddr)
+	provider, _, err := getProvider(ctx, n.resolvedProvider)
 	if err != nil {
 		diags = diags.Append(&hcl.Diagnostic{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf("Failed to get provider for %s", ai.Addr),
+			Summary:  fmt.Sprintf("Failed to get provider for %s", n.resolvedProvider),
 			Detail:   fmt.Sprintf("Failed to get provider: %s", err),
 			Subject:  n.ActionTriggerRange,
 		})
 		return diags
 	}
 
-	actionSchema, ok := schema.Actions[ai.Addr.Action.Action.Type]
-	if !ok {
-		// This should have been caught earlier
-		diags = diags.Append(&hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf("Action %s not found in provider schema", ai.Addr),
-			Detail:   fmt.Sprintf("The action %s was not found in the provider schema for %s", ai.Addr.Action.Action.Type, actionData.ProviderAddr),
-			Subject:  n.ActionTriggerRange,
-		})
+	// actionSchema, ok := schema.Actions[n.actionConfig.Addr.Action.Type]
+	// if !ok {
+	// 	// This should have been caught earlier
+	// 	diags = diags.Append(&hcl.Diagnostic{
+	// 		Severity: hcl.DiagError,
+	// 		Summary:  fmt.Sprintf("Action %s not found in provider schema", n.actionConfig.Addr),
+	// 		Detail:   fmt.Sprintf("The action %s was not found in the provider schema for %s", n.actionConfig.Addr.Action.Type, n.resolvedProvider),
+	// 		Subject:  n.ActionTriggerRange,
+	// 	})
+	// 	return diags
+	// }
+
+	configValue, actionDiags := n.actionConfig.Eval(ctx)
+	diags = diags.Append(actionDiags)
+	if diags.HasErrors() {
 		return diags
 	}
 
-	configValue := actionData.ConfigValue
-
-	// Validate that what we planned matches the action data we have.
-	errs := objchange.AssertObjectCompatible(actionSchema.ConfigSchema, ai.ConfigValue, ephemeral.RemoveEphemeralValues(configValue))
-	for _, err := range errs {
-		diags = diags.Append(&hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Provider produced inconsistent final plan",
-			Detail: fmt.Sprintf("When expanding the plan for %s to include new values learned so far during apply, Terraform produced an invalid new value for %s.\n\nThis is a bug in Terraform, which should be reported.",
-				ai.Addr, tfdiags.FormatError(err)),
-			Subject: n.ActionTriggerRange,
-		})
+	// FIXME: action eval is going to be refactored so we don't need to duplicate this
+	switch key := n.ActionInvocation.Addr.Action.Key.(type) {
+	case addrs.StringKey:
+		switch {
+		case configValue.Type().IsMapType():
+			configValue = configValue.Index(key.Value())
+		case configValue.Type().IsObjectType():
+			configValue = configValue.GetAttr(key.Value().AsString())
+		default:
+			panic(fmt.Sprintf("invalid config value type: %#v", configValue.Type()))
+		}
+	case addrs.IntKey:
+		configValue = configValue.Index(key.Value())
 	}
+
+	// FIXME: action plans can't alter the config value, so there's no reason to check with objchange
+	//
+	// // Validate that what we planned matches the action data we have.
+	// errs := objchange.AssertObjectCompatible(actionSchema.ConfigSchema, ai.ConfigValue, ephemeral.RemoveEphemeralValues(configValue))
+	// for _, err := range errs {
+	// 	diags = diags.Append(&hcl.Diagnostic{
+	// 		Severity: hcl.DiagError,
+	// 		Summary:  "Provider produced inconsistent final plan",
+	// 		Detail: fmt.Sprintf("When expanding the plan for %s to include new values learned so far during apply, Terraform produced an invalid new value for %s.\n\nThis is a bug in Terraform, which should be reported.",
+	// 			ai.Addr, tfdiags.FormatError(err)),
+	// 		Subject: n.ActionTriggerRange,
+	// 	})
+	// }
 
 	if !configValue.IsWhollyKnown() {
 		return diags.Append(&hcl.Diagnostic{
 			Severity: hcl.DiagError,
 			Summary:  "Action configuration unknown during apply",
-			Detail:   fmt.Sprintf("The action %s was not fully known during apply.\n\nThis is a bug in Terraform, please report it.", ai.Addr.Action.String()),
-			Subject:  n.ActionTriggerRange,
+			Detail:   fmt.Sprintf("The action %s was not fully known during apply.\n\nThis is a bug in Terraform, please report it.", n.ActionInvocation.Addr),
+			// FIXME: maybe turn this into an attribute path diagnostic?
+			Subject: n.actionConfig.Config.DeclRange.Ptr(),
 		})
 	}
 
 	hookIdentity := HookActionIdentity{
-		Addr:          ai.Addr,
-		ActionTrigger: ai.ActionTrigger,
+		Addr:          n.ActionInvocation.Addr,
+		ActionTrigger: n.ActionInvocation.ActionTrigger,
 	}
 
 	diags = diags.Append(ctx.Hook(func(h Hook) (HookAction, error) {
@@ -152,7 +155,7 @@ func (n *nodeActionTriggerApplyInstance) Execute(ctx EvalContext, wo walkOperati
 	// above because we want the ephemeral values to be included.
 	unmarkedConfigValue, _ := configValue.UnmarkDeep()
 	resp := provider.InvokeAction(providers.InvokeActionRequest{
-		ActionType:         ai.Addr.Action.Action.Type,
+		ActionType:         n.ActionInvocation.Addr.Action.Action.Type,
 		PlannedActionData:  unmarkedConfigValue,
 		ClientCapabilities: ctx.ClientCapabilities(),
 	})
@@ -259,7 +262,9 @@ func (n *nodeActionTriggerApplyInstance) AddSubjectToDiagnostics(input tfdiags.D
 			Severity: severity,
 			Summary:  message,
 			Detail:   err.Error(),
-			Subject:  n.ActionTriggerRange,
+
+			// FIXME: this is the action config block, make sure user can associate this with the trigger
+			Subject: n.actionConfig.Config.DeclRange.Ptr(),
 		})
 	}
 	return diags

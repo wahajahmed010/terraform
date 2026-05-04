@@ -84,7 +84,7 @@ type graphWalkOpts struct {
 }
 
 func (c *Context) walk(graph *Graph, operation walkOperation, opts *graphWalkOpts) (*ContextGraphWalker, tfdiags.Diagnostics) {
-	log.Printf("[DEBUG] Starting graph walk: %s", operation.String())
+	log.Printf("[DEBUG] Starting graph walk: %s", operation)
 
 	walker := c.graphWalker(graph, operation, opts)
 

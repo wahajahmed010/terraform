@@ -41,13 +41,14 @@ type NodeApplyableResourceInstance struct {
 }
 
 var (
-	_ GraphNodeConfigResource     = (*NodeApplyableResourceInstance)(nil)
-	_ GraphNodeResourceInstance   = (*NodeApplyableResourceInstance)(nil)
-	_ GraphNodeCreator            = (*NodeApplyableResourceInstance)(nil)
-	_ GraphNodeReferencer         = (*NodeApplyableResourceInstance)(nil)
-	_ GraphNodeDeposer            = (*NodeApplyableResourceInstance)(nil)
-	_ GraphNodeExecutable         = (*NodeApplyableResourceInstance)(nil)
-	_ GraphNodeAttachDependencies = (*NodeApplyableResourceInstance)(nil)
+	_ GraphNodeConfigResource         = (*NodeApplyableResourceInstance)(nil)
+	_ GraphNodeResourceInstance       = (*NodeApplyableResourceInstance)(nil)
+	_ GraphNodeCreator                = (*NodeApplyableResourceInstance)(nil)
+	_ GraphNodeReferencer             = (*NodeApplyableResourceInstance)(nil)
+	_ GraphNodeDeposer                = (*NodeApplyableResourceInstance)(nil)
+	_ GraphNodeExecutable             = (*NodeApplyableResourceInstance)(nil)
+	_ GraphNodeAttachDependencies     = (*NodeApplyableResourceInstance)(nil)
+	_ GraphNodeActionProviderConsumer = (*NodeApplyableResourceInstance)(nil)
 )
 
 // GraphNodeCreator
@@ -397,7 +398,33 @@ func (n *NodeApplyableResourceInstance) managedResourceExecute(ctx EvalContext) 
 	// _after_ writing the state because we want to check against
 	// the result of the operation, and to fail on future operations
 	// until the user makes the condition succeed.
-	return diags.Append(n.managedResourcePostconditions(ctx, repData))
+	diags = diags.Append(n.managedResourcePostconditions(ctx, repData))
+
+	diags = diags.Append(n.invokeActions(ctx))
+
+	return diags
+}
+
+func (n *NodeApplyableResourceInstance) invokeActions(ctx EvalContext) tfdiags.Diagnostics {
+	var diags tfdiags.Diagnostics
+
+	for _, inv := range n.actionTriggers {
+		// FIXME: is this always walkApply or do we need to get the original arg passed down here?
+		diags = diags.Append(inv.Execute(ctx, walkApply))
+		if diags.HasErrors() {
+			break
+		}
+	}
+
+	return diags
+}
+
+func (n *NodeApplyableResourceInstance) ActionProviders() []ProviderRef {
+	var refs []ProviderRef
+	for _, trigger := range n.actionTriggers {
+		refs = append(refs, ProviderRef{Addr: trigger.actionConfig.ResolvedProvider, Resolved: true})
+	}
+	return refs
 }
 
 func (n *NodeApplyableResourceInstance) managedResourcePostconditions(ctx EvalContext, repeatData instances.RepetitionData) (diags tfdiags.Diagnostics) {

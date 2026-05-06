@@ -16,7 +16,7 @@ import (
 	"github.com/hashicorp/terraform/internal/tfdiags"
 )
 
-type nodeActionTriggerApplyInstance struct {
+type actionTriggerApplyInstance struct {
 	ActionInvocation *plans.ActionInvocationInstanceSrc
 	resolvedProvider addrs.AbsProviderConfig
 
@@ -27,21 +27,21 @@ type nodeActionTriggerApplyInstance struct {
 
 	// link the trigger to it's action config
 	// this is connected by the diff transformer
-	actionConfig *NodeActionConfig
+	actionNode *NodeActionConfig
 }
 
 var (
-	_ GraphNodeExecutable       = (*nodeActionTriggerApplyInstance)(nil)
-	_ GraphNodeReferencer       = (*nodeActionTriggerApplyInstance)(nil)
-	_ GraphNodeProviderConsumer = (*nodeActionTriggerApplyInstance)(nil)
-	_ GraphNodeModulePath       = (*nodeActionTriggerApplyInstance)(nil)
+	_ GraphNodeExecutable       = (*actionTriggerApplyInstance)(nil)
+	_ GraphNodeReferencer       = (*actionTriggerApplyInstance)(nil)
+	_ GraphNodeProviderConsumer = (*actionTriggerApplyInstance)(nil)
+	_ GraphNodeModulePath       = (*actionTriggerApplyInstance)(nil)
 )
 
-func (n *nodeActionTriggerApplyInstance) Name() string {
+func (n *actionTriggerApplyInstance) Name() string {
 	return n.ActionInvocation.Addr.String() + " (instance)"
 }
 
-func (n *nodeActionTriggerApplyInstance) Execute(ctx EvalContext, wo walkOperation) tfdiags.Diagnostics {
+func (n *actionTriggerApplyInstance) Execute(ctx EvalContext, wo walkOperation) tfdiags.Diagnostics {
 	var diags tfdiags.Diagnostics
 	actionInvocation := n.ActionInvocation
 
@@ -81,7 +81,7 @@ func (n *nodeActionTriggerApplyInstance) Execute(ctx EvalContext, wo walkOperati
 		return diags
 	}
 
-	if n.actionConfig == nil {
+	if n.actionNode == nil {
 		diags = diags.Append(&hcl.Diagnostic{
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf("Invoke %s missing action config", n.ActionInvocation.Addr),
@@ -91,7 +91,7 @@ func (n *nodeActionTriggerApplyInstance) Execute(ctx EvalContext, wo walkOperati
 		return diags
 	}
 
-	configValue, actionDiags := n.actionConfig.Eval(ctx)
+	configValue, actionDiags := n.actionNode.Eval(ctx)
 	diags = diags.Append(actionDiags)
 	if diags.HasErrors() {
 		return diags
@@ -112,27 +112,13 @@ func (n *nodeActionTriggerApplyInstance) Execute(ctx EvalContext, wo walkOperati
 		configValue = configValue.Index(key.Value())
 	}
 
-	// FIXME: action plans can't alter the config value, so there's no reason to check with objchange
-	//
-	// // Validate that what we planned matches the action data we have.
-	// errs := objchange.AssertObjectCompatible(actionSchema.ConfigSchema, ai.ConfigValue, ephemeral.RemoveEphemeralValues(configValue))
-	// for _, err := range errs {
-	// 	diags = diags.Append(&hcl.Diagnostic{
-	// 		Severity: hcl.DiagError,
-	// 		Summary:  "Provider produced inconsistent final plan",
-	// 		Detail: fmt.Sprintf("When expanding the plan for %s to include new values learned so far during apply, Terraform produced an invalid new value for %s.\n\nThis is a bug in Terraform, which should be reported.",
-	// 			ai.Addr, tfdiags.FormatError(err)),
-	// 		Subject: n.ActionTriggerRange,
-	// 	})
-	// }
-
 	if !configValue.IsWhollyKnown() {
 		return diags.Append(&hcl.Diagnostic{
 			Severity: hcl.DiagError,
 			Summary:  "Action configuration unknown during apply",
 			Detail:   fmt.Sprintf("The action %s was not fully known during apply.\n\nThis is a bug in Terraform, please report it.", n.ActionInvocation.Addr),
 			// FIXME: maybe turn this into an attribute path diagnostic?
-			Subject: n.actionConfig.Config.DeclRange.Ptr(),
+			Subject: n.actionNode.Config.DeclRange.Ptr(),
 		})
 	}
 
@@ -205,18 +191,18 @@ func (n *nodeActionTriggerApplyInstance) Execute(ctx EvalContext, wo walkOperati
 	return diags
 }
 
-func (n *nodeActionTriggerApplyInstance) Provider() ProviderRef {
+func (n *actionTriggerApplyInstance) Provider() ProviderRef {
 	return ProviderRef{
 		Addr:     n.ActionInvocation.ProviderAddr,
 		Resolved: true,
 	}
 }
 
-func (n *nodeActionTriggerApplyInstance) SetProvider(config addrs.AbsProviderConfig) {
+func (n *actionTriggerApplyInstance) SetProvider(config addrs.AbsProviderConfig) {
 	n.resolvedProvider = config
 }
 
-func (n *nodeActionTriggerApplyInstance) References() []*addrs.Reference {
+func (n *actionTriggerApplyInstance) References() []*addrs.Reference {
 	var refs []*addrs.Reference
 
 	refs = append(refs, &addrs.Reference{
@@ -235,16 +221,16 @@ func (n *nodeActionTriggerApplyInstance) References() []*addrs.Reference {
 }
 
 // GraphNodeReferencer
-func (n *nodeActionTriggerApplyInstance) ModulePath() addrs.Module {
+func (n *actionTriggerApplyInstance) ModulePath() addrs.Module {
 	return n.ActionInvocation.Addr.Module.Module()
 }
 
 // GraphNodeExecutable
-func (n *nodeActionTriggerApplyInstance) Path() addrs.ModuleInstance {
+func (n *actionTriggerApplyInstance) Path() addrs.ModuleInstance {
 	return n.ActionInvocation.Addr.Module
 }
 
-func (n *nodeActionTriggerApplyInstance) AddSubjectToDiagnostics(input tfdiags.Diagnostics) tfdiags.Diagnostics {
+func (n *actionTriggerApplyInstance) AddSubjectToDiagnostics(input tfdiags.Diagnostics) tfdiags.Diagnostics {
 	var diags tfdiags.Diagnostics
 	if len(input) > 0 {
 		severity := hcl.DiagWarning
@@ -262,7 +248,7 @@ func (n *nodeActionTriggerApplyInstance) AddSubjectToDiagnostics(input tfdiags.D
 			Detail:   err.Error(),
 
 			// FIXME: this is the action config block, make sure user can associate this with the trigger
-			Subject: n.actionConfig.Config.DeclRange.Ptr(),
+			Subject: n.actionNode.Config.DeclRange.Ptr(),
 		})
 	}
 	return diags

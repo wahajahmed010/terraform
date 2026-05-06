@@ -39,10 +39,10 @@ func (n *nodeActionTriggerApplyExpand) DynamicExpand(ctx EvalContext) (*Graph, t
 		panic("Only actions triggered by plan and apply are supported")
 	}
 
-	invocationMap := map[*plans.ActionInvocationInstanceSrc]*nodeActionTriggerApplyInstance{}
+	invocationMap := map[*plans.ActionInvocationInstanceSrc]*actionTriggerApplyInstance{}
 	// We already planned the action invocations, so we can just add them to the graph
 	for _, ai := range n.actionInvocationInstances {
-		node := &nodeActionTriggerApplyInstance{
+		node := &actionTriggerApplyInstance{
 			ActionInvocation:   ai,
 			resolvedProvider:   n.resolvedProvider,
 			ActionTriggerRange: n.triggerConfig.invokingSubject.Ptr(),

@@ -254,29 +254,6 @@ func (t *ProviderTransformer) Transform(g *Graph) error {
 		}
 	}
 
-	// Connect requests for ActionProviders to the correct providers. The Action
-	// nodes handle resolution and closing via the same
-	// GraphNodeProviderConsumer as resources, so this is only taking care of
-	// connecting triggers to the action providers to make sure the ordering is
-	// correct.
-
-	// FIXME: Plan doesn't need this because we have the action nodes to resolve
-	// the action providers now, but do we need that for apply?
-	//
-	// for v, refs := range forActions {
-	//  for key, ref := range refs {
-	//      target := m[key]
-	//      if target == nil {
-	//          // No target and no path to traverse up from
-	//          diags = diags.Append(fmt.Errorf("%s: action provider %s couldn't be found", dag.VertexName(v), ref.AbsProviderConfig()))
-	//          continue
-	//      }
-
-	// 		log.Printf("[DEBUG] ProviderTransformer: connecting %s to action provider %s", dag.VertexName(v), ref.AbsProviderConfig())
-	// 		g.Connect(dag.BasicEdge(v, target))
-	// 	}
-	// }
-
 	return diags.Err()
 }
 

@@ -249,9 +249,9 @@ func (n *NodeAbstractResource) References() []*addrs.Reference {
 		// resolution. What it doesn't take care of is provider closing, so the
 		// resource will still have to produce it's own provider refs for
 		// actions.
-		for _, actionRef := range trigger.actions {
+		for _, actionRef := range trigger.actionRefs {
 			result = append(result, &addrs.Reference{
-				Subject: actionRef.action.Addr.Action,
+				Subject: actionRef.actionNode.Addr.Action,
 				// this is OK for References(), since they are only used to
 				// connect the graph, and don't need the source or any remaining
 				// traversal
@@ -377,8 +377,8 @@ func (n *NodeAbstractResource) ActionProviders() []ProviderRef {
 
 	var res []ProviderRef
 	for _, trigger := range n.actionTriggers {
-		for _, actionRef := range trigger.actions {
-			res = append(res, actionRef.action.Provider())
+		for _, actionRef := range trigger.actionRefs {
+			res = append(res, actionRef.actionNode.Provider())
 		}
 	}
 	return res
@@ -652,22 +652,16 @@ func graphNodesAreResourceInstancesInDifferentInstancesOfSameModule(a, b dag.Ver
 	return !aModInst.Equal(bModInst)
 }
 
-// FIXME: temp container for each trigger and linked action nodes
+// FIXME: temp container for each trigger and linked action node
 type planResourceActionTrigger struct {
-	config *configs.ActionTrigger
-
-	// FIXME: rename refs
-	actions []actionRef
+	config     *configs.ActionTrigger
+	actionRefs []actionRef
 }
 
-// actionRef stored the reference to an action config with the reference
-// expression itself, so that we can get refine it to the individual action
-// instance during evaluation.
+// actionRef stores the reference to an action config with the reference
+// expression itself, so that we can refine it to the individual action instance
+// during evaluation.
 type actionRef struct {
-	// FIXME: rename cfg
-	ref    configs.ActionRef
-	action *NodeActionConfig
-}
-
-type applyResousrceActionTrigger struct {
+	configRef  configs.ActionRef
+	actionNode *NodeActionConfig
 }

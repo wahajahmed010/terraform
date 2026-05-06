@@ -199,9 +199,9 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 						})
 						continue
 					}
-					triggerRef.actions = append(triggerRef.actions, actionRef{
-						ref:    action,
-						action: actionNode,
+					triggerRef.actionRefs = append(triggerRef.actionRefs, actionRef{
+						configRef:  action,
+						actionNode: actionNode,
 					})
 				}
 				abstract.actionTriggers = append(abstract.actionTriggers, triggerRef)

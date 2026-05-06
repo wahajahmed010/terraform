@@ -54,6 +54,9 @@ type NodeAbstractResourceInstance struct {
 	// override is set by the graph itself, just before this node executes.
 	override *configs.Override
 
+	// FIXME: this is duplicated here when it also exists in
+	// NodeResourceAbstract because we are directly assigning it rather than
+	// using an attachment interface.
 	actionTriggers []*planResourceActionTrigger
 }
 

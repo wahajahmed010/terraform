@@ -21,8 +21,7 @@ import (
 type NodeDestroyResourceInstance struct {
 	*NodeAbstractResourceInstance
 
-	// FIXME: not a node
-	actionTriggers []*nodeActionTriggerApplyInstance
+	actionTriggers []*actionTriggerApplyInstance
 }
 
 var (

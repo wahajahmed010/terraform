@@ -595,7 +595,7 @@ func (n *NodePlannableResourceInstance) reportDeferredActionTriggers(ctx EvalCon
 	// event is regardless of what the deferral claims, because an update could
 	// instead result in a create, destroy, or noop events.
 	for _, trigger := range n.actionTriggers {
-		for _, action := range trigger.actions {
+		for _, action := range trigger.actionRefs {
 			deferrals.ReportActionInvocationDeferred(plans.ActionInvocationInstance{
 				// FIXME: actions don't expand with modules, so this address
 				// isn't really representative of the real address.
@@ -603,7 +603,7 @@ func (n *NodePlannableResourceInstance) reportDeferredActionTriggers(ctx EvalCon
 				// FIXME x2: we may or may not be able to expand the referenced
 				// instance depending on the deferral, so how should deferrals
 				// handle that?
-				Addr: action.action.Addr.Absolute(n.Addr.Module).Instance(addrs.NoKey),
+				Addr: action.actionNode.Addr.Absolute(n.Addr.Module).Instance(addrs.NoKey),
 				ActionTrigger: &plans.ResourceActionTrigger{
 					TriggeringResourceAddr: n.Addr,
 				},
@@ -639,9 +639,7 @@ func (n *NodePlannableResourceInstance) planActionTriggers(ctx EvalContext, resR
 
 		for _, event := range actionIsTriggeredByEvent(trigger.config.Events, n.change.Action) {
 			// FIXME: setup order for apply?
-			for _, action := range trigger.actions {
-				// FIXME: need to link the action reference to the action object
-
+			for _, action := range trigger.actionRefs {
 				diags = diags.Append(n.planActionTrigger(ctx, resRepData, action, event))
 			}
 		}
@@ -652,7 +650,7 @@ func (n *NodePlannableResourceInstance) planActionTriggers(ctx EvalContext, resR
 
 func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRepData instances.RepetitionData, actionRef actionRef, event configs.ActionTriggerEvent) tfdiags.Diagnostics {
 	var diags tfdiags.Diagnostics
-	actionBlockVal, actionDiags := actionRef.action.Eval(ctx)
+	actionBlockVal, actionDiags := actionRef.actionNode.Eval(ctx)
 	diags = diags.Append(actionDiags)
 	if diags.HasErrors() {
 		return diags
@@ -667,12 +665,13 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 	}
 
 	// FIXME: marks in index value?
-	ref, evalActionDiags := evaluateActionExpression(actionRef.ref.Expr, resRepData)
+	ref, evalActionDiags := evaluateActionExpression(actionRef.configRef.Expr, resRepData)
 	diags = append(diags, evalActionDiags...)
 	if diags.HasErrors() {
 		return diags
 	}
-	// FIXME: check this
+
+	// FIXME: double check this
 	var actionInst addrs.ActionInstance
 	switch sub := ref.Subject.(type) {
 	case addrs.Action:
@@ -706,7 +705,7 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 			Severity: hcl.DiagError,
 			Summary:  "Reference to non-existent action instance",
 			Detail:   "Action instance was not found in the current context.",
-			Subject:  actionRef.ref.Expr.Range().Ptr(),
+			Subject:  actionRef.configRef.Expr.Range().Ptr(),
 		})
 		return diags
 	}
@@ -715,13 +714,13 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 
 	// FIXME Marks! sensitive, ephemeral and deprecations
 
-	provider, _, err := getProvider(ctx, actionRef.action.ResolvedProvider)
+	provider, _, err := getProvider(ctx, actionRef.actionNode.ResolvedProvider)
 	if err != nil {
 		diags = diags.Append(&hcl.Diagnostic{
 			Severity: hcl.DiagError,
 			Summary:  "Failed to get provider",
 			Detail:   fmt.Sprintf("Failed to get provider: %s", err),
-			Subject:  actionRef.action.Config.DeclRange.Ptr(),
+			Subject:  actionRef.actionNode.Config.DeclRange.Ptr(),
 		})
 
 		return diags
@@ -731,19 +730,21 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 	unmarkedConfig, _ := actionVal.UnmarkDeepWithPaths()
 
 	cc := ctx.ClientCapabilities()
+
 	// FIXME: deferrals in actions?
 	cc.DeferralAllowed = false
 
 	resp := provider.PlanAction(providers.PlanActionRequest{
-		ActionType:         actionRef.action.Addr.Action.Type,
+		ActionType:         actionRef.actionNode.Addr.Action.Type,
 		ProposedActionData: unmarkedConfig,
 		ClientCapabilities: cc,
 	})
 
 	// FIXME: config body is not the entire action config block
 	// Our diagnostics expect to be associated with a config body, but we may not have one due to the structure of actions.
-	if actionRef.action.Config.Config != nil {
-		resp.Diagnostics = resp.Diagnostics.InConfigBody(actionRef.action.Config.Config, actionRef.action.Addr.String())
+	// How wo we get the action block, and not the action's config block?
+	if actionRef.actionNode.Config.Config != nil {
+		resp.Diagnostics = resp.Diagnostics.InConfigBody(actionRef.actionNode.Config.Config, actionRef.actionNode.Addr.String())
 	}
 
 	// FIXME: this diagnostic handling is incorrect, but it matches
@@ -762,7 +763,7 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 			Severity: severity,
 			Summary:  message,
 			Detail:   err.Error(),
-			Subject:  actionRef.ref.Range.Ptr(),
+			Subject:  actionRef.configRef.Range.Ptr(),
 		})
 	}
 
@@ -780,7 +781,7 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 		Addr:          actionInst.Absolute(n.Addr.Module),
 		ActionTrigger: at,
 		ConfigValue:   ephemeral.RemoveEphemeralValues(actionVal),
-		ProviderAddr:  actionRef.action.ResolvedProvider,
+		ProviderAddr:  actionRef.actionNode.ResolvedProvider,
 	}
 
 	ctx.Changes().AppendActionInvocation(ai)

@@ -74,16 +74,6 @@ func (t *TargetsTransformer) selectTargetedNodes(g *Graph, addrs []addrs.Targeta
 			if tn, ok := v.(GraphNodeTargetable); ok {
 				tn.SetTargets(addrs)
 			}
-
-			// FIXME: have we fixed this?
-			// if _, ok := v.(*nodeExpandPlannableResource); ok {
-			// 	// We want to also set the resource instance triggers on the related action triggers
-			// 	for _, d := range g.UpEdges(v) {
-			// 		if actionTrigger, ok := d.(*nodeActionTriggerPlanExpand); ok {
-			// 			actionTrigger.SetResourceTargets(addrs)
-			// 		}
-			// 	}
-			// }
 		}
 	}
 
@@ -164,7 +154,7 @@ func (t *TargetsTransformer) nodeIsTarget(v dag.Vertex, targets []addrs.Targetab
 		vertexAddr = r.ResourceAddr()
 	case *nodeActionInvokeExpand:
 		vertexAddr = r.Addr
-	case *nodeActionTriggerApplyInstance:
+	case *actionTriggerApplyInstance:
 		vertexAddr = r.ActionInvocation.Addr
 
 	default:

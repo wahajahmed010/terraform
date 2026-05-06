@@ -36,8 +36,7 @@ type NodeApplyableResourceInstance struct {
 	// reasons, like a -replace flag or via replace_triggered_by.
 	forceReplace bool
 
-	// FIXME: not a node
-	actionTriggers []*nodeActionTriggerApplyInstance
+	actionTriggers []*actionTriggerApplyInstance
 }
 
 var (
@@ -409,7 +408,6 @@ func (n *NodeApplyableResourceInstance) invokeActions(ctx EvalContext) tfdiags.D
 	var diags tfdiags.Diagnostics
 
 	for _, inv := range n.actionTriggers {
-		// FIXME: is this always walkApply or do we need to get the original arg passed down here?
 		diags = diags.Append(inv.Execute(ctx, walkApply))
 		if diags.HasErrors() {
 			break
@@ -422,7 +420,7 @@ func (n *NodeApplyableResourceInstance) invokeActions(ctx EvalContext) tfdiags.D
 func (n *NodeApplyableResourceInstance) ActionProviders() []ProviderRef {
 	var refs []ProviderRef
 	for _, trigger := range n.actionTriggers {
-		refs = append(refs, ProviderRef{Addr: trigger.actionConfig.ResolvedProvider, Resolved: true})
+		refs = append(refs, ProviderRef{Addr: trigger.actionNode.ResolvedProvider, Resolved: true})
 	}
 	return refs
 }

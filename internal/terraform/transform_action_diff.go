@@ -56,10 +56,10 @@ func (t *ActionDiffTransformer) Transform(g *Graph) error {
 				if destroy {
 					if n, ok := atn.(*NodeDestroyResourceInstance); ok {
 						// FIXME: this doesn't deal with deposed or forget instances
-						n.actionTriggers = append(n.actionTriggers, &nodeActionTriggerApplyInstance{
+						n.actionTriggers = append(n.actionTriggers, &actionTriggerApplyInstance{
 							ActionInvocation: ai,
 							resolvedProvider: ai.ProviderAddr,
-							actionConfig:     actionConfig,
+							actionNode:       actionConfig,
 						})
 						foundNode = true
 
@@ -68,10 +68,10 @@ func (t *ActionDiffTransformer) Transform(g *Graph) error {
 				}
 
 				if n, ok := atn.(*NodeApplyableResourceInstance); ok {
-					n.actionTriggers = append(n.actionTriggers, &nodeActionTriggerApplyInstance{
+					n.actionTriggers = append(n.actionTriggers, &actionTriggerApplyInstance{
 						ActionInvocation: ai,
 						resolvedProvider: ai.ProviderAddr,
-						actionConfig:     actionConfig,
+						actionNode:       actionConfig,
 					})
 					foundNode = true
 				}
@@ -90,9 +90,9 @@ func (t *ActionDiffTransformer) Transform(g *Graph) error {
 			}
 
 			// Add nodes for each action invocation
-			node := &nodeActionTriggerApplyInstance{
+			node := &actionTriggerApplyInstance{
 				ActionInvocation: ai,
-				actionConfig:     actionConfig,
+				actionNode:       actionConfig,
 			}
 			g.Add(node)
 		}

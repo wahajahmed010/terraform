@@ -601,55 +601,6 @@ resource "test_object" "a" {
 				expectPlanActionCalled: false,
 			},
 
-			//
-			// FIXME: Planning has no side effects, and is equivalent to validation, so we now evaluate all actions
-			//
-			// 			"failing actions cancel next ones": {
-			// 				module: map[string]string{
-			// 					"main.tf": `
-			// action "test_action" "failure" {}
-			// resource "test_object" "a" {
-			//   lifecycle {
-			//     action_trigger {
-			//       events = [before_create]
-			//       actions = [action.test_action.failure, action.test_action.failure]
-			//     }
-			//     action_trigger {
-			//       events = [before_create]
-			//       actions = [action.test_action.failure]
-			//     }
-			//   }
-			// }
-			// `,
-			// 				},
-
-			// 				planActionFn: func(_ *testing.T, _ providers.PlanActionRequest) providers.PlanActionResponse {
-			// 					t.Helper()
-			// 					return providers.PlanActionResponse{
-			// 						Diagnostics: tfdiags.Diagnostics{
-			// 							tfdiags.Sourceless(tfdiags.Error, "Planning failed", "Test case simulates an error while planning"),
-			// 						},
-			// 					}
-			// 				},
-
-			// 				expectPlanActionCalled: true,
-			// 				// We only expect a single diagnostic here, the other should not have been called because the first one failed.
-			// 				expectPlanDiagnostics: func(m *configs.Config) tfdiags.Diagnostics {
-			// 					return tfdiags.Diagnostics{}.Append(
-			// 						&hcl.Diagnostic{
-			// 							Severity: hcl.DiagError,
-			// 							Summary:  "Failed to plan action",
-			// 							Detail:   "Planning failed: Test case simulates an error while planning",
-			// 							Subject: &hcl.Range{
-			// 								Filename: filepath.Join(m.Module.SourceDir, "main.tf"),
-			// 								Start:    hcl.Pos{Line: 7, Column: 8, Byte: 147},
-			// 								End:      hcl.Pos{Line: 7, Column: 46, Byte: 173},
-			// 							},
-			// 						},
-			// 					)
-			// 				},
-			// 			},
-
 			"actions with warnings don't cancel": {
 				module: map[string]string{
 					"main.tf": `
@@ -1332,30 +1283,6 @@ resource "test_object" "a" {
 `,
 				},
 				expectPlanActionCalled: true, // The cycle only appears in the apply graph
-				//
-				// FIXME: This was only an error because of the graph structure
-				//
-				// assertPlanDiagnostics: func(t *testing.T, diags
-				// tfdiags.Diagnostics) {
-				//  if !diags.HasErrors() {
-				//      t.Fatalf("expected diagnostics to have errors, but it does not")
-				//  }
-				//  if len(diags) != 1 {
-				//      t.Fatalf("expected diagnostics to have 1 error, but it has %d", len(diags))
-				//  }
-				//  // We expect the diagnostic to be about a cycle
-				//  if !strings.Contains(diags[0].Description().Summary, "Cycle") {
-				//      t.Fatalf("expected diagnostic summary to contain 'Cycle', got '%s'", diags[0].Description().Summary)
-				//  }
-				//  // We expect the action node to be part of the cycle
-				//  if !strings.Contains(diags[0].Description().Summary, "action.test_action.hello") {
-				//      t.Fatalf("expected diagnostic summary to contain 'action.test_action.hello', got '%s'", diags[0].Description().Summary)
-				//  }
-				//  // We expect the resource node to be part of the cycle
-				//  if !strings.Contains(diags[0].Description().Summary, "test_object.a") {
-				//      t.Fatalf("expected diagnostic summary to contain 'test_object.a', got '%s'", diags[0].Description().Summary)
-				//  }
-				// },
 			},
 
 			"secret values": {
@@ -2305,24 +2232,6 @@ resource "other_object" "a" {
 					if got := len(p.Changes.ActionInvocations); got != 0 {
 						t.Fatalf("expected 0 planned action invocations, got %d", got)
 					}
-
-					// FIXME: there can't be any invocation to defer if we never
-					// got to expand the triggering resource
-					//
-					// if got := len(p.DeferredActionInvocations); got != 1 {
-					//  t.Fatalf("expected 1 deferred action invocations, got %d", got)
-					// } ac, err :=
-					// p.DeferredActionInvocations[0].Decode(&testActionSchema)
-					// if err != nil {
-					//  t.Fatalf("error decoding action invocation: %s", err)
-					// } if ac.DeferredReason !=
-					// providers.DeferredReasonInstanceCountUnknown {
-					//  t.Fatalf("expected DeferredReasonInstanceCountUnknown, got %s", ac.DeferredReason)
-					// } if
-					// ac.ActionInvocationInstance.ConfigValue.GetAttr("attr").AsString()
-					// != "static" {
-					//  t.Fatalf("expected attr to be static, got %s", ac.ActionInvocationInstance.ConfigValue.GetAttr("attr").AsString())
-					// }
 				},
 			},
 			"action with unknown module expansion and unknown instances": {

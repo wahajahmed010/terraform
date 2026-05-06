@@ -35,51 +35,66 @@ func (t *ActionDiffTransformer) Transform(g *Graph) error {
 	}
 
 	for _, ai := range t.Changes.ActionInvocations {
-		lat, ok := ai.ActionTrigger.(*plans.ResourceActionTrigger)
-		if !ok {
-			continue
-		}
+		switch actionTrigger := ai.ActionTrigger.(type) {
+		case *plans.ResourceActionTrigger:
+			atns, ok := resourceInstanceNodes.GetOk(actionTrigger.TriggeringResourceAddr)
+			if !ok {
+				return fmt.Errorf("no resource node found for action trigger %s", actionTrigger.TriggeringResourceAddr)
+			}
 
-		atns, ok := resourceInstanceNodes.GetOk(lat.TriggeringResourceAddr)
-		if !ok {
-			return fmt.Errorf("no resource node found for action trigger %s", lat.TriggeringResourceAddr)
-		}
+			destroy := actionTrigger.ActionTriggerEvent == configs.EventBeforeDestroy || actionTrigger.ActionTriggerEvent == configs.EventAfterDestroy
+			foundNode := false
 
-		destroy := lat.ActionTriggerEvent == configs.EventBeforeDestroy || lat.ActionTriggerEvent == configs.EventAfterDestroy
-		foundNode := false
+			actionConfig, ok := actionConfigNodes.GetOk(ai.Addr.ConfigAction())
+			if !ok {
+				return fmt.Errorf("no action config node found for action trigger %s", actionTrigger.TriggeringResourceAddr)
+			}
 
-		actionConfig, ok := actionConfigNodes.GetOk(ai.Addr.ConfigAction())
-		if !ok {
-			return fmt.Errorf("no action config node found for action trigger %s", lat.TriggeringResourceAddr)
-		}
+			// Add the action triggers to their instance nodes.
+			for _, atn := range atns {
 
-		// Add the action triggers to their instance nodes.
-		for _, atn := range atns {
-			if destroy {
-				if n, ok := atn.(*NodeDestroyResourceInstance); ok {
-					// FIXME: this doesn't deal with deposed or forget instances
+				if destroy {
+					if n, ok := atn.(*NodeDestroyResourceInstance); ok {
+						// FIXME: this doesn't deal with deposed or forget instances
+						n.actionTriggers = append(n.actionTriggers, &nodeActionTriggerApplyInstance{
+							ActionInvocation: ai,
+							resolvedProvider: ai.ProviderAddr,
+							actionConfig:     actionConfig,
+						})
+						foundNode = true
+
+					}
+					continue
+				}
+
+				if n, ok := atn.(*NodeApplyableResourceInstance); ok {
 					n.actionTriggers = append(n.actionTriggers, &nodeActionTriggerApplyInstance{
 						ActionInvocation: ai,
 						resolvedProvider: ai.ProviderAddr,
 						actionConfig:     actionConfig,
 					})
 					foundNode = true
-
 				}
-				continue
+			}
+			if !foundNode {
+				return fmt.Errorf("no resource node found for action trigger %s", actionTrigger.TriggeringResourceAddr)
+			}
+		case *plans.InvokeActionTrigger:
+			// FIXME: this may be invoking a resource action even though it was
+			// invoked, and we need to differentiate those calls for the new
+			// impl
+
+			actionConfig, ok := actionConfigNodes.GetOk(ai.Addr.ConfigAction())
+			if !ok {
+				panic(fmt.Sprintf("FIXME: missing action for invoke: %s", ai.Addr))
 			}
 
-			if n, ok := atn.(*NodeApplyableResourceInstance); ok {
-				n.actionTriggers = append(n.actionTriggers, &nodeActionTriggerApplyInstance{
-					ActionInvocation: ai,
-					resolvedProvider: ai.ProviderAddr,
-					actionConfig:     actionConfig,
-				})
-				foundNode = true
+			// Add nodes for each action invocation
+			node := &nodeActionTriggerApplyInstance{
+				ActionInvocation: ai,
+				actionConfig:     actionConfig,
 			}
-		}
-		if !foundNode {
-			return fmt.Errorf("no resource node found for action trigger %s", lat.TriggeringResourceAddr)
+			g.Add(node)
 		}
 	}
 

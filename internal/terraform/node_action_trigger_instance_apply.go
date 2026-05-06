@@ -81,17 +81,15 @@ func (n *nodeActionTriggerApplyInstance) Execute(ctx EvalContext, wo walkOperati
 		return diags
 	}
 
-	// actionSchema, ok := schema.Actions[n.actionConfig.Addr.Action.Type]
-	// if !ok {
-	// 	// This should have been caught earlier
-	// 	diags = diags.Append(&hcl.Diagnostic{
-	// 		Severity: hcl.DiagError,
-	// 		Summary:  fmt.Sprintf("Action %s not found in provider schema", n.actionConfig.Addr),
-	// 		Detail:   fmt.Sprintf("The action %s was not found in the provider schema for %s", n.actionConfig.Addr.Action.Type, n.resolvedProvider),
-	// 		Subject:  n.ActionTriggerRange,
-	// 	})
-	// 	return diags
-	// }
+	if n.actionConfig == nil {
+		diags = diags.Append(&hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  fmt.Sprintf("Invoke %s missing action config", n.ActionInvocation.Addr),
+			Detail:   fmt.Sprintf("The action config was not found for invocation %s", n.ActionInvocation.Addr),
+			Subject:  n.ActionTriggerRange,
+		})
+		return diags
+	}
 
 	configValue, actionDiags := n.actionConfig.Eval(ctx)
 	diags = diags.Append(actionDiags)

@@ -178,12 +178,13 @@ func (b *ApplyGraphBuilder) Steps() []GraphTransformer {
 		// 	},
 		// },
 
-		&ActionInvokeApplyTransformer{
-			Config:        b.Config,
-			Operation:     b.Operation,
-			ActionTargets: b.ActionTargets,
-			Changes:       b.Changes,
-		},
+		// FIXME: this is the same job as the ActionDiffTransformer
+		// &ActionInvokeApplyTransformer{
+		// 	Config:        b.Config,
+		// 	Operation:     b.Operation,
+		// 	ActionTargets: b.ActionTargets,
+		// 	Changes:       b.Changes,
+		// },
 
 		&ActionDiffTransformer{
 			Changes: b.Changes,

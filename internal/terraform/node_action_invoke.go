@@ -180,7 +180,7 @@ func (n *nodeActionInvokeInstance) invokeActions(ctx EvalContext) tfdiags.Diagno
 	return diags
 }
 
-func (n *nodeActionInvokeInstance) invokeAction(ctx EvalContext, config configs.Action, addr addrs.AbsActionInstance, configVal cty.Value) tfdiags.Diagnostics {
+func (n *nodeActionInvokeInstance) invokeAction(ctx EvalContext, config *configs.Action, addr addrs.AbsActionInstance, configVal cty.Value) tfdiags.Diagnostics {
 	var diags tfdiags.Diagnostics
 
 	ai := plans.ActionInvocationInstance{

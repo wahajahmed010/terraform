@@ -98,7 +98,7 @@ type NodeAbstractResource struct {
 	// that the action nodes can be resolved to the correct provider in the
 	// graph, while allowing the triggering node to also connect to the same
 	// provider.
-	actionTriggers []*planResourceActionTrigger
+	actionTriggers []*resourceActionTrigger
 }
 
 var (
@@ -652,8 +652,7 @@ func graphNodesAreResourceInstancesInDifferentInstancesOfSameModule(a, b dag.Ver
 	return !aModInst.Equal(bModInst)
 }
 
-// FIXME: temp container for each trigger and linked action node
-type planResourceActionTrigger struct {
+type resourceActionTrigger struct {
 	config     *configs.ActionTrigger
 	actionRefs []actionRef
 }

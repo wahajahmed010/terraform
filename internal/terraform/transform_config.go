@@ -139,7 +139,7 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 			log.Printf("[TRACE] ConfigTransformer: Adding action %s", addr)
 			abstract := &NodeActionConfig{
 				Addr:   addr,
-				Config: *a,
+				Config: a,
 			}
 
 			g.Add(abstract)
@@ -158,7 +158,7 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 		var diags tfdiags.Diagnostics
 		if r.Managed != nil && r.Managed.ActionTriggers != nil {
 			for _, at := range r.Managed.ActionTriggers {
-				triggerRef := &planResourceActionTrigger{
+				triggerRef := &resourceActionTrigger{
 					config: at,
 				}
 				for _, action := range at.Actions {

@@ -176,6 +176,8 @@ func (n *actionTriggerApplyInstance) References() []*addrs.Reference {
 		Subject: n.ActionInvocation.Addr.Action,
 	})
 
+	refs = append(refs, n.actionNode.References()...)
+
 	return refs
 }
 

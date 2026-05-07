@@ -24,8 +24,7 @@ import (
 type NodeActionConfig struct {
 	Addr addrs.ConfigAction
 
-	// FIXME: pointer for consistency
-	Config configs.Action
+	Config *configs.Action
 
 	// The fields below will be automatically set using the Attach interfaces if
 	// you're running those transforms, but also can be explicitly set if you

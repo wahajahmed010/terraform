@@ -7,12 +7,8 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/hcl/v2"
-	"github.com/zclconf/go-cty/cty"
 
 	"github.com/hashicorp/terraform/internal/addrs"
-	"github.com/hashicorp/terraform/internal/configs"
-	"github.com/hashicorp/terraform/internal/instances"
-	"github.com/hashicorp/terraform/internal/lang/langrefs"
 	"github.com/hashicorp/terraform/internal/plans"
 	"github.com/hashicorp/terraform/internal/providers"
 	"github.com/hashicorp/terraform/internal/tfdiags"
@@ -199,99 +195,4 @@ func (n *actionTriggerApplyInstance) AddSubjectToDiagnostics(input tfdiags.Diagn
 		})
 	}
 	return diags
-}
-
-type actionConditionContext struct {
-	events          []configs.ActionTriggerEvent
-	conditionExpr   hcl.Expression
-	resourceAddress addrs.AbsResourceInstance
-}
-
-// FIXME: check the condition eval elsewhere against this
-func evaluateActionCondition(ctx EvalContext, at actionConditionContext) (bool, tfdiags.Diagnostics) {
-	var diags tfdiags.Diagnostics
-
-	rd := instances.RepetitionData{}
-	refs, refDiags := langrefs.ReferencesInExpr(addrs.ParseRef, at.conditionExpr)
-	diags = diags.Append(refDiags)
-	if diags.HasErrors() {
-		return false, diags
-	}
-
-	for _, ref := range refs {
-		if ref.Subject == addrs.Self {
-			diags = diags.Append(&hcl.Diagnostic{
-				Severity: hcl.DiagError,
-				Summary:  "Self reference not allowed",
-				Detail:   `The condition expression cannot reference "self".`,
-				Subject:  at.conditionExpr.Range().Ptr(),
-			})
-		}
-	}
-
-	if diags.HasErrors() {
-		return false, diags
-	}
-
-	if containsBeforeEvent(at.events) {
-		// If events contains a before event we want to error if count or each is used
-		for _, ref := range refs {
-			if _, ok := ref.Subject.(addrs.CountAttr); ok {
-				diags = diags.Append(&hcl.Diagnostic{
-					Severity: hcl.DiagError,
-					Summary:  "Count reference not allowed",
-					Detail:   `The condition expression cannot reference "count" if the action is run before the resource is applied.`,
-					Subject:  at.conditionExpr.Range().Ptr(),
-				})
-			}
-
-			if _, ok := ref.Subject.(addrs.ForEachAttr); ok {
-				diags = diags.Append(&hcl.Diagnostic{
-					Severity: hcl.DiagError,
-					Summary:  "Each reference not allowed",
-					Detail:   `The condition expression cannot reference "each" if the action is run before the resource is applied.`,
-					Subject:  at.conditionExpr.Range().Ptr(),
-				})
-			}
-
-			if diags.HasErrors() {
-				return false, diags
-			}
-		}
-	} else {
-		// If there are only after events we allow self, count, and each
-		expander := ctx.InstanceExpander()
-		rd = expander.GetResourceInstanceRepetitionData(at.resourceAddress)
-	}
-
-	scope := ctx.EvaluationScope(nil, nil, rd)
-	val, conditionEvalDiags := scope.EvalExpr(at.conditionExpr, cty.Bool)
-	diags = diags.Append(conditionEvalDiags)
-	if diags.HasErrors() {
-		return false, diags
-	}
-
-	if !val.IsWhollyKnown() {
-		diags = diags.Append(&hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Condition must be known",
-			Detail:   "The condition expression resulted in an unknown value, but it must be a known boolean value.",
-			Subject:  at.conditionExpr.Range().Ptr(),
-		})
-		return false, diags
-	}
-
-	return val.True(), nil
-}
-
-func containsBeforeEvent(events []configs.ActionTriggerEvent) bool {
-	for _, event := range events {
-		switch event {
-		case configs.EventBeforeCreate, configs.EventBeforeUpdate:
-			return true
-		default:
-			continue
-		}
-	}
-	return false
 }

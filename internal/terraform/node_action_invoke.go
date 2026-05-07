@@ -24,7 +24,7 @@ var (
 )
 
 type nodeActionInvokeExpand struct {
-	// and invoke always relies on targeting, and we need to capture the initial
+	// invoke always relies on targeting, and we need to capture the initial
 	// target here to ensure we only expand the targeted instances
 	Target addrs.Targetable
 
@@ -234,4 +234,25 @@ func (n *nodeActionInvokeInstance) invokeAction(ctx EvalContext, config configs.
 
 	ctx.Changes().AppendActionInvocation(&ai)
 	return diags
+}
+
+// nodeActionInvokeApplyInstance represents a single action instance to call,
+// which was triggered via a manual invoke command.
+type nodeActionInvokeApplyInstance struct {
+	*actionTriggerApplyInstance
+}
+
+var (
+	_ GraphNodeExecutable       = (*nodeActionInvokeApplyInstance)(nil)
+	_ GraphNodeReferencer       = (*nodeActionInvokeApplyInstance)(nil)
+	_ GraphNodeProviderConsumer = (*nodeActionInvokeApplyInstance)(nil)
+	_ GraphNodeModulePath       = (*nodeActionInvokeApplyInstance)(nil)
+)
+
+func (n *nodeActionInvokeApplyInstance) Name() string {
+	return n.ActionInvocation.Addr.String() + " (invoke)"
+}
+
+func (n *nodeActionInvokeApplyInstance) Execute(ctx EvalContext, op walkOperation) tfdiags.Diagnostics {
+	return n.invoke(ctx, op)
 }

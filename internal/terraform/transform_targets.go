@@ -152,9 +152,11 @@ func (t *TargetsTransformer) nodeIsTarget(v dag.Vertex, targets []addrs.Targetab
 		vertexAddr = r.ResourceInstanceAddr()
 	case GraphNodeConfigResource:
 		vertexAddr = r.ResourceAddr()
+
+	// invoke nodes are implicitly targeted
 	case *nodeActionInvokeExpand:
 		vertexAddr = r.Addr
-	case *actionTriggerApplyInstance:
+	case *nodeActionInvokeApplyInstance:
 		vertexAddr = r.ActionInvocation.Addr
 
 	default:

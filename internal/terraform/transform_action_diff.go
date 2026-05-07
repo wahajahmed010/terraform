@@ -52,7 +52,6 @@ func (t *ActionDiffTransformer) Transform(g *Graph) error {
 
 			// Add the action triggers to their instance nodes.
 			for _, atn := range atns {
-
 				if destroy {
 					if n, ok := atn.(*NodeDestroyResourceInstance); ok {
 						// FIXME: this doesn't deal with deposed or forget instances
@@ -81,8 +80,8 @@ func (t *ActionDiffTransformer) Transform(g *Graph) error {
 			}
 		case *plans.InvokeActionTrigger:
 			// FIXME: this may be invoking a resource action even though it was
-			// invoked, and we need to differentiate those calls for the new
-			// impl
+			// added from an invoke command, and we need to differentiate those
+			// calls for the new impl
 
 			actionConfig, ok := actionConfigNodes.GetOk(ai.Addr.ConfigAction())
 			if !ok {
@@ -90,9 +89,12 @@ func (t *ActionDiffTransformer) Transform(g *Graph) error {
 			}
 
 			// Add nodes for each action invocation
-			node := &actionTriggerApplyInstance{
-				ActionInvocation: ai,
-				actionNode:       actionConfig,
+			// FIXME: missing condition
+			node := &nodeActionInvokeApplyInstance{
+				&actionTriggerApplyInstance{
+					ActionInvocation: ai,
+					actionNode:       actionConfig,
+				},
 			}
 			g.Add(node)
 		}

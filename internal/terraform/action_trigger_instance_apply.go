@@ -22,55 +22,20 @@ type actionTriggerApplyInstance struct {
 	ActionInvocation *plans.ActionInvocationInstanceSrc
 	resolvedProvider addrs.AbsProviderConfig
 
-	// FIXME: this is no longer populated
-	ActionTriggerRange *hcl.Range
-
-	ConditionExpr hcl.Expression
-
-	// link the trigger to it's action config
-	// this is connected by the diff transformer
+	// actionNode links the trigger to it's action config node.
+	// This is connected by the diff transformer.
 	actionNode *NodeActionConfig
 }
 
 var (
-	_ GraphNodeExecutable       = (*actionTriggerApplyInstance)(nil)
+	// this doesn't operate as an independent node in the graph, but we obtain
+	// the relevant information for evaluataion via these interfaces
 	_ GraphNodeReferencer       = (*actionTriggerApplyInstance)(nil)
 	_ GraphNodeProviderConsumer = (*actionTriggerApplyInstance)(nil)
-	_ GraphNodeModulePath       = (*actionTriggerApplyInstance)(nil)
 )
 
-func (n *actionTriggerApplyInstance) Name() string {
-	return n.ActionInvocation.Addr.String() + " (instance)"
-}
-
-func (n *actionTriggerApplyInstance) Execute(ctx EvalContext, wo walkOperation) tfdiags.Diagnostics {
+func (n *actionTriggerApplyInstance) invoke(ctx EvalContext, wo walkOperation) tfdiags.Diagnostics {
 	var diags tfdiags.Diagnostics
-	actionInvocation := n.ActionInvocation
-
-	if n.ConditionExpr != nil {
-		// We know this must be a lifecycle action, otherwise we would have no condition
-		at := actionInvocation.ActionTrigger.(*plans.ResourceActionTrigger)
-		condition, conditionDiags := evaluateActionCondition(ctx, actionConditionContext{
-			// For applying the triggering event is sufficient, if the condition could not have
-			// been evaluated due to in invalid mix of events we would have caught it durin planning.
-			events:          []configs.ActionTriggerEvent{at.ActionTriggerEvent},
-			conditionExpr:   n.ConditionExpr,
-			resourceAddress: at.TriggeringResourceAddr,
-		})
-		diags = diags.Append(conditionDiags)
-		if diags.HasErrors() {
-			return diags
-		}
-
-		if !condition {
-			return diags.Append(&hcl.Diagnostic{
-				Severity: hcl.DiagError,
-				Summary:  "Condition changed evaluation during apply",
-				Detail:   "The condition evaluated to false during apply, but was true during planning. This may lead to unexpected behavior.",
-				Subject:  n.ConditionExpr.Range().Ptr(),
-			})
-		}
-	}
 
 	provider, _, err := getProvider(ctx, n.resolvedProvider)
 	if err != nil {
@@ -78,7 +43,7 @@ func (n *actionTriggerApplyInstance) Execute(ctx EvalContext, wo walkOperation) 
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf("Failed to get provider for %s", n.resolvedProvider),
 			Detail:   fmt.Sprintf("Failed to get provider: %s", err),
-			Subject:  n.ActionTriggerRange,
+			Subject:  n.actionNode.Config.DeclRange.Ptr(),
 		})
 		return diags
 	}
@@ -88,7 +53,7 @@ func (n *actionTriggerApplyInstance) Execute(ctx EvalContext, wo walkOperation) 
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf("Invoke %s missing action config", n.ActionInvocation.Addr),
 			Detail:   fmt.Sprintf("The action config was not found for invocation %s", n.ActionInvocation.Addr),
-			Subject:  n.ActionTriggerRange,
+			Subject:  n.actionNode.Config.DeclRange.Ptr(),
 		})
 		return diags
 	}
@@ -186,7 +151,7 @@ func (n *actionTriggerApplyInstance) Execute(ctx EvalContext, wo walkOperation) 
 			Severity: hcl.DiagError,
 			Summary:  "Provider return invalid response",
 			Detail:   "Provider response did not include any events",
-			Subject:  n.ActionTriggerRange,
+			Subject:  n.actionNode.Config.DeclRange.Ptr(),
 		})
 	}
 
@@ -210,14 +175,6 @@ func (n *actionTriggerApplyInstance) References() []*addrs.Reference {
 	refs = append(refs, &addrs.Reference{
 		Subject: n.ActionInvocation.Addr.Action,
 	})
-
-	conditionRefs, refDiags := langrefs.ReferencesInExpr(addrs.ParseRef, n.ConditionExpr)
-	if refDiags.HasErrors() {
-		panic(fmt.Sprintf("error parsing references in expression: %v", refDiags))
-	}
-	if conditionRefs != nil {
-		refs = append(refs, conditionRefs...)
-	}
 
 	return refs
 }
@@ -262,6 +219,7 @@ type actionConditionContext struct {
 	resourceAddress addrs.AbsResourceInstance
 }
 
+// FIXME: check the condition eval elsewhere against this
 func evaluateActionCondition(ctx EvalContext, at actionConditionContext) (bool, tfdiags.Diagnostics) {
 	var diags tfdiags.Diagnostics
 

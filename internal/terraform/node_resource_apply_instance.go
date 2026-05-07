@@ -407,8 +407,8 @@ func (n *NodeApplyableResourceInstance) managedResourceExecute(ctx EvalContext) 
 func (n *NodeApplyableResourceInstance) invokeActions(ctx EvalContext) tfdiags.Diagnostics {
 	var diags tfdiags.Diagnostics
 
-	for _, inv := range n.actionTriggers {
-		diags = diags.Append(inv.Execute(ctx, walkApply))
+	for _, trigger := range n.actionTriggers {
+		diags = diags.Append(trigger.invoke(ctx, walkApply))
 		if diags.HasErrors() {
 			break
 		}

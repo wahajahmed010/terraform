@@ -58,25 +58,11 @@ func (n *actionTriggerApplyInstance) invoke(ctx EvalContext, wo walkOperation) t
 		return diags
 	}
 
-	configValue, actionDiags := n.actionNode.Eval(ctx)
+	// FIXME: missing action trigger reference for diags
+	configValue, actionDiags := n.actionNode.EvalInstance(ctx, n.ActionInvocation.Addr.Action.Key, nil)
 	diags = diags.Append(actionDiags)
 	if diags.HasErrors() {
 		return diags
-	}
-
-	// FIXME: action eval is going to be refactored so we don't need to duplicate this
-	switch key := n.ActionInvocation.Addr.Action.Key.(type) {
-	case addrs.StringKey:
-		switch {
-		case configValue.Type().IsMapType():
-			configValue = configValue.Index(key.Value())
-		case configValue.Type().IsObjectType():
-			configValue = configValue.GetAttr(key.Value().AsString())
-		default:
-			panic(fmt.Sprintf("invalid config value type: %#v", configValue.Type()))
-		}
-	case addrs.IntKey:
-		configValue = configValue.Index(key.Value())
 	}
 
 	if !configValue.IsWhollyKnown() {

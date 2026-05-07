@@ -84,7 +84,7 @@ func (n *nodeActionInvokeExpand) DynamicExpand(ctx EvalContext) (*Graph, tfdiags
 			continue
 		}
 
-		g.Add(&nodeActionInvokeInstance{
+		g.Add(&nodeActionPlanInvoke{
 			Module:       mod,
 			Addr:         n.Addr,
 			ActionConfig: n.ActionConfig,
@@ -97,90 +97,43 @@ func (n *nodeActionInvokeExpand) DynamicExpand(ctx EvalContext) (*Graph, tfdiags
 }
 
 var (
-	_ GraphNodeExecutable     = (*nodeActionInvokeInstance)(nil)
-	_ GraphNodeModuleInstance = (*nodeActionInvokeInstance)(nil)
+	_ GraphNodeExecutable     = (*nodeActionPlanInvoke)(nil)
+	_ GraphNodeModuleInstance = (*nodeActionPlanInvoke)(nil)
 )
 
-type nodeActionInvokeInstance struct {
+type nodeActionPlanInvoke struct {
 	Module       addrs.ModuleInstance
 	Addr         addrs.AbsActionInstance
 	ActionConfig *NodeActionConfig
 	ProviderAddr addrs.AbsProviderConfig
 }
 
-func (n *nodeActionInvokeInstance) Path() addrs.ModuleInstance {
+func (n *nodeActionPlanInvoke) Path() addrs.ModuleInstance {
 	return n.Module
 }
 
-func (n *nodeActionInvokeInstance) Execute(ctx EvalContext, _ walkOperation) tfdiags.Diagnostics {
+func (n *nodeActionPlanInvoke) Execute(ctx EvalContext, _ walkOperation) tfdiags.Diagnostics {
 	// for now each action instance will be invoked serially
 	return n.invokeActions(ctx)
 }
 
-func (n *nodeActionInvokeInstance) invokeActions(ctx EvalContext) tfdiags.Diagnostics {
+func (n *nodeActionPlanInvoke) invokeActions(ctx EvalContext) tfdiags.Diagnostics {
 	var diags tfdiags.Diagnostics
 
-	actionBlockVal, actionDiags := n.ActionConfig.Eval(ctx)
+	actionVals, actionDiags := n.ActionConfig.EvalInstances(ctx, n.Addr.Action, nil)
 	diags = diags.Append(actionDiags)
 	if diags.HasErrors() {
 		return diags
 	}
 
-	// break up the action block value into individual instances
-	instanceConfigs := addrs.MakeMap[addrs.AbsActionInstance, cty.Value]()
-
-	actionVal := actionBlockVal
-	switch key := n.Addr.Action.Key.(type) {
-	case addrs.StringKey:
-		if n.ActionConfig.Config.ForEach == nil {
-			panic("FIXME: wrong kind of string expansion")
-		}
-		switch {
-		case actionBlockVal.Type().IsMapType():
-			actionVal = actionBlockVal.Index(key.Value())
-		case actionBlockVal.Type().IsObjectType():
-			actionVal = actionBlockVal.GetAttr(key.Value().AsString())
-		}
-
-		instanceConfigs.Put(n.Addr, actionVal)
-
-	case addrs.IntKey:
-		if n.ActionConfig.Config.Count == nil {
-			panic("FIXME: wrong kind of int expansion ")
-		}
-		if !actionBlockVal.Type().IsListType() && !actionBlockVal.Type().IsTupleType() {
-			panic(fmt.Sprintf("FIXME: wrong kind of expansion %#v", actionBlockVal.Type()))
-		}
-		actionVal = actionBlockVal.Index(key.Value())
-
-		instanceConfigs.Put(n.Addr, actionVal)
-
-	default:
-		switch {
-		case n.ActionConfig.Config.Count != nil:
-			for k, v := range actionBlockVal.Elements() {
-				i, _ := k.AsBigFloat().Int64()
-				// rewrite the address for the correct instance
-				instanceConfigs.Put(n.Addr.ContainingAction().Instance(addrs.IntKey(i)), v)
-			}
-		case n.ActionConfig.Config.ForEach != nil:
-			for k, v := range actionBlockVal.Elements() {
-				// rewrite the address for the correct instance
-				instanceConfigs.Put(n.Addr.ContainingAction().Instance(addrs.StringKey(k.AsString())), v)
-			}
-		default:
-			instanceConfigs.Put(n.Addr, actionBlockVal)
-		}
-	}
-
-	for k, v := range instanceConfigs.Iter() {
-		diags = diags.Append(n.invokeAction(ctx, n.ActionConfig.Config, k, v))
+	for key, actionVal := range actionVals.Iter() {
+		diags = diags.Append(n.planAction(ctx, n.ActionConfig.Config, key.Absolute(ctx.Path()), actionVal))
 	}
 
 	return diags
 }
 
-func (n *nodeActionInvokeInstance) invokeAction(ctx EvalContext, config *configs.Action, addr addrs.AbsActionInstance, configVal cty.Value) tfdiags.Diagnostics {
+func (n *nodeActionPlanInvoke) planAction(ctx EvalContext, config *configs.Action, addr addrs.AbsActionInstance, configVal cty.Value) tfdiags.Diagnostics {
 	var diags tfdiags.Diagnostics
 
 	ai := plans.ActionInvocationInstance{

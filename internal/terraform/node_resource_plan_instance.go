@@ -650,11 +650,6 @@ func (n *NodePlannableResourceInstance) planActionTriggers(ctx EvalContext, resR
 
 func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRepData instances.RepetitionData, actionRef actionRef, event configs.ActionTriggerEvent) tfdiags.Diagnostics {
 	var diags tfdiags.Diagnostics
-	actionBlockVal, actionDiags := actionRef.actionNode.Eval(ctx)
-	diags = diags.Append(actionDiags)
-	if diags.HasErrors() {
-		return diags
-	}
 
 	at := &plans.ResourceActionTrigger{
 		TriggeringResourceAddr: n.Addr,
@@ -671,7 +666,6 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 		return diags
 	}
 
-	// FIXME: double check this
 	var actionInst addrs.ActionInstance
 	switch sub := ref.Subject.(type) {
 	case addrs.Action:
@@ -679,38 +673,14 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 	case addrs.ActionInstance:
 		actionInst = sub
 	default:
-		panic(fmt.Sprintf("unknown action type: %T", sub))
+		panic(fmt.Sprintf("unknown action address type: %T", sub))
 	}
 
-	var actionVal cty.Value
-	switch key := actionInst.Key.(type) {
-	case addrs.IntKey:
-		i, _ := key.Value().AsBigFloat().Int64()
-		ty := actionBlockVal.Type()
-		if ty.IsTupleType() && actionBlockVal.LengthInt() > int(i) {
-			actionVal = actionBlockVal.Index(key.Value())
-		}
-	case addrs.StringKey:
-		str := key.Value().AsString()
-		ty := actionBlockVal.Type()
-		if ty.IsObjectType() && ty.HasAttribute(str) {
-			actionVal = actionBlockVal.GetAttr(key.Value().AsString())
-		}
-	default:
-		actionVal = actionBlockVal
-	}
-
-	if actionVal == cty.NilVal {
-		diags = diags.Append(&hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "Reference to non-existent action instance",
-			Detail:   "Action instance was not found in the current context.",
-			Subject:  actionRef.configRef.Expr.Range().Ptr(),
-		})
+	actionVal, actionDiags := actionRef.actionNode.EvalInstance(ctx, actionInst.Key, actionRef.configRef.Expr.Range().Ptr())
+	diags = diags.Append(actionDiags)
+	if diags.HasErrors() {
 		return diags
 	}
-
-	// FIXME: make sure index errors are checked, otherwise we panic
 
 	// FIXME Marks! sensitive, ephemeral and deprecations
 

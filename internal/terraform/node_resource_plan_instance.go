@@ -652,14 +652,12 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 	var diags tfdiags.Diagnostics
 
 	at := &plans.ResourceActionTrigger{
-		TriggeringResourceAddr: n.Addr,
-		// FIXME: indexes
-		ActionTriggerBlockIndex: 0,
-		ActionsListIndex:        0,
+		TriggeringResourceAddr:  n.Addr,
+		ActionTriggerBlockIndex: actionRef.blockIndex,
+		ActionsListIndex:        actionRef.actionIndex,
 		ActionTriggerEvent:      event,
 	}
 
-	// FIXME: marks in index value?
 	ref, evalActionDiags := evaluateActionExpression(actionRef.configRef.Expr, resRepData)
 	diags = append(diags, evalActionDiags...)
 	if diags.HasErrors() {
@@ -682,8 +680,6 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 		return diags
 	}
 
-	// FIXME Marks! sensitive, ephemeral and deprecations
-
 	provider, _, err := getProvider(ctx, actionRef.actionNode.ResolvedProvider)
 	if err != nil {
 		diags = diags.Append(&hcl.Diagnostic{
@@ -696,12 +692,13 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 		return diags
 	}
 
-	// We remove the marks for planning, we will record the sensitive values in the plans.ActionInvocationInstance
 	unmarkedConfig, _ := actionVal.UnmarkDeepWithPaths()
 
 	cc := ctx.ClientCapabilities()
 
-	// FIXME: deferrals in actions?
+	// FIXME: Why are there deferrals in actions? An action must respond to an
+	// event, but deferring an action would remove it from the event and
+	// therefore it wouldn't ever be invoked.
 	cc.DeferralAllowed = false
 
 	resp := provider.PlanAction(providers.PlanActionRequest{
@@ -738,9 +735,6 @@ func (n *NodePlannableResourceInstance) planActionTrigger(ctx EvalContext, resRe
 	}
 
 	if resp.Deferred != nil {
-		// FIXME: We can't apply the resource change and defer an action,
-		// because there won't ever be a future event to retrigger the deferred
-		// action. Should we remove Deferred altogether?
 		diags = diags.Append(deferring.UnexpectedProviderDeferralDiagnostic(actionInst))
 	}
 	if resp.Diagnostics.HasErrors() {

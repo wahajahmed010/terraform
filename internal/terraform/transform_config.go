@@ -157,11 +157,11 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 		// Verify that any actions referenced in the resource's ActionTriggers exist in this module
 		var diags tfdiags.Diagnostics
 		if r.Managed != nil && r.Managed.ActionTriggers != nil {
-			for _, at := range r.Managed.ActionTriggers {
+			for blockIdx, at := range r.Managed.ActionTriggers {
 				triggerRef := &resourceActionTrigger{
 					config: at,
 				}
-				for _, action := range at.Actions {
+				for actionIdx, action := range at.Actions {
 					refs, parseRefDiags := langrefs.ReferencesInExpr(addrs.ParseRef, action.Expr)
 					if parseRefDiags != nil {
 						return parseRefDiags.Err()
@@ -178,7 +178,7 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 						case addrs.CountAttr, addrs.ForEachAttr:
 							// nothing to do, these will get evaluated later
 						default:
-							// This should have been caught during validation
+							// This should have been caught during config loading
 							panic(fmt.Sprintf("unexpected action address %T", a))
 						}
 					}
@@ -200,8 +200,10 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 						continue
 					}
 					triggerRef.actionRefs = append(triggerRef.actionRefs, actionRef{
-						configRef:  action,
-						actionNode: actionNode,
+						configRef:   action,
+						actionNode:  actionNode,
+						blockIndex:  blockIdx,
+						actionIndex: actionIdx,
 					})
 				}
 				abstract.actionTriggers = append(abstract.actionTriggers, triggerRef)

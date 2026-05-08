@@ -663,4 +663,11 @@ type resourceActionTrigger struct {
 type actionRef struct {
 	configRef  configs.ActionRef
 	actionNode *NodeActionConfig
+
+	// Block and action indexes to record in the plan where the calls
+	// originated.
+	//
+	// FIXME: are two indexes really needed when we know the overall order?
+	blockIndex  int
+	actionIndex int
 }

@@ -26,9 +26,10 @@ type ActionInvocationInstance struct {
 	// used to apply it.
 	ProviderAddr addrs.AbsProviderConfig
 
-	// FIXME: this shouldn't be used, but will be required for destroy.
+	// FIXME: this shouldn't be used yet, but will be required for destroy.
 	// FIXME: what do we do about write-only attributes or ephemeral values in
 	// destroy scenarios?
+	// FIXME: sensitive paths are missing
 	ConfigValue cty.Value
 }
 

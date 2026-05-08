@@ -250,6 +250,7 @@ func (n *NodeAbstractResource) References() []*addrs.Reference {
 		// resource will still have to produce it's own provider refs for
 		// actions.
 		for _, actionRef := range trigger.actionRefs {
+
 			result = append(result, &addrs.Reference{
 				Subject: actionRef.actionNode.Addr.Action,
 				// this is OK for References(), since they are only used to
@@ -664,10 +665,10 @@ type actionRef struct {
 	configRef  configs.ActionRef
 	actionNode *NodeActionConfig
 
+	// FIXME: are two indexes really needed when we know the overall order? This
+	// mirrors the plan structure for now.
 	// Block and action indexes to record in the plan where the calls
 	// originated.
-	//
-	// FIXME: are two indexes really needed when we know the overall order?
 	blockIndex  int
 	actionIndex int
 }

@@ -41,8 +41,6 @@ type NodeActionConfig struct {
 	ResolvedProvider addrs.AbsProviderConfig
 	Schema           *providers.ActionSchema
 	Dependencies     []addrs.ConfigResource
-
-	// TODO: cache evaluations?
 }
 
 var (
@@ -274,7 +272,10 @@ func (n *NodeActionConfig) repetitionData(ctx EvalContext) ([]instances.Repetiti
 }
 
 // The invoke command can reference an action block to invoke all instances, so
-// here we return a value representing the entire block if we have an addrs.NoKey
+// here we return a value representing the entire block if we have an
+// addrs.NoKey This function uses addrs.ActionInstance even though it only needs
+// the key because we need to use use a full instance addr for the resulting map
+// keys anyway.
 func (n *NodeActionConfig) EvalInstances(ctx EvalContext, addr addrs.ActionInstance, callRange *hcl.Range) (addrs.Map[addrs.ActionInstance, cty.Value], tfdiags.Diagnostics) {
 	all := addrs.MakeMap[addrs.ActionInstance, cty.Value]()
 

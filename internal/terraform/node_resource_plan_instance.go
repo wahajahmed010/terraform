@@ -638,7 +638,6 @@ func (n *NodePlannableResourceInstance) planActionTriggers(ctx EvalContext, resR
 		}
 
 		for _, event := range actionIsTriggeredByEvent(trigger.config.Events, n.change.Action) {
-			// FIXME: setup order for apply?
 			for _, action := range trigger.actionRefs {
 				diags = diags.Append(n.planActionTrigger(ctx, resRepData, action, event))
 			}

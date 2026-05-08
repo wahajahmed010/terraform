@@ -149,27 +149,63 @@ func (t *ReferenceTransformer) Transform(g *Graph) error {
 			}
 
 			if !graphNodesAreResourceInstancesInDifferentInstancesOfSameModule(v, parent) {
+				log.Printf("[DEBUG] ReferenceTransformer: %q references: %v", dag.VertexName(v), dag.VertexName(parent))
 				g.Connect(dag.BasicEdge(v, parent))
 			}
 		}
 	}
 
-	// now we can go back and connect the actions
+	actionCycleError := func(ref, action dag.Vertex) error {
+		return fmt.Errorf("action reference cycle involving %s and %s", dag.VertexName(action), dag.VertexName(ref))
+	}
+
+	// now we can go back and connect the action configs to their dependencies
 	for _, v := range vs {
-		if _, ok := v.(*NodeActionConfig); !ok {
+		actionConfig, ok := v.(*NodeActionConfig)
+		if !ok {
 			continue
 		}
 
-		// FIXME: this should still error if it's not a direct reference,
-		// because there's no valid order to evaluate the intermediary.
-		for _, referred := range m.References(v) {
-			if g.Ancestors(referred).Include(v) {
-				log.Printf("[WARN] ReferenceTransformer: skipping %s => %s due to reference cycle", dag.VertexName(v), dag.VertexName(referred))
+		for _, ref := range m.References(actionConfig) {
+			if g.Ancestors(ref).Include(actionConfig) {
+				// We know we have a cycle, now we need to check if it's allowed
+				// for use in legacy action config.
+				resource, isConfigResource := ref.(GraphNodeConfigResource)
+				_, isResourceInstance := ref.(GraphNodeResourceInstance)
+				if !isConfigResource {
+					return actionCycleError(ref, actionConfig)
+				}
+
+				if isResourceInstance {
+					// we are really only concerned with finding cycles
+					// originating from the config resource nodes which hold the
+					// references to the action. Instances complicate that
+					// because they rely on references to the config node for
+					// general ordering.
+					continue
+				}
+
+				// The reference is a resource node, and we'll allow it if it
+				// directly references back to the same action node. Only direct
+				// references are allowed here, and more complex cycles will
+				// still error out later during graph validation.
+				for _, backRef := range m.References(resource) {
+					backAction, ok := backRef.(*NodeActionConfig)
+					if !ok {
+						continue
+					}
+
+					if !backAction.Addr.Equal(actionConfig.Addr) {
+						return actionCycleError(ref, actionConfig)
+					}
+				}
+
+				log.Printf("[WARN] ReferenceTransformer: skipping %s => %s due to reference cycle", dag.VertexName(actionConfig), dag.VertexName(ref))
 				continue
 			}
 
-			g.Connect(dag.BasicEdge(v, referred))
-			log.Printf("[DEBUG] ReferenceTransformer: %q references: %v", dag.VertexName(v), dag.VertexName(referred))
+			g.Connect(dag.BasicEdge(actionConfig, ref))
+			log.Printf("[DEBUG] ReferenceTransformer: %q references: %v", dag.VertexName(actionConfig), dag.VertexName(ref))
 		}
 	}
 

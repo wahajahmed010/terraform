@@ -196,8 +196,6 @@ func (t *TargetsTransformer) nodeIsTarget(v dag.Vertex, targets []addrs.Targetab
 // triggering node has planned so that we can ensure the actions are only planned if the triggering
 // resource has an action (Create / Update) corresponding to one of the events in the action trigger
 // blocks event list.
-//
-// FIXME: we shouldn't need this function
 func (t *TargetsTransformer) addVertexDependenciesToTargetedNodes(g *Graph, v dag.Vertex, targetedNodes dag.Set, addrs []addrs.Targetable) {
 	if targetedNodes.Include(v) {
 		return

@@ -154,11 +154,11 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 		abstract := &NodeAbstractResource{
 			Addr: configAddr,
 		}
-		// Verify that any actions referenced in the resource's ActionTriggers exist in this module
 		var diags tfdiags.Diagnostics
+
 		if r.Managed != nil && r.Managed.ActionTriggers != nil {
 			for blockIdx, at := range r.Managed.ActionTriggers {
-				triggerRef := &resourceActionTrigger{
+				resActTrig := &resourceActionTrigger{
 					config: at,
 				}
 				for actionIdx, action := range at.Actions {
@@ -183,6 +183,7 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 						}
 					}
 
+					// Verify that any actions referenced in the resource's ActionTriggers exist in this module
 					actionNode, ok := allConfigActions[configAction.String()]
 					if !ok {
 						suggestion := didyoumean.NameSuggestion(configAction.String(), slices.Collect(maps.Keys(allConfigActions)))
@@ -199,14 +200,14 @@ func (t *ConfigTransformer) transformSingle(g *Graph, config *configs.Config) er
 						})
 						continue
 					}
-					triggerRef.actionRefs = append(triggerRef.actionRefs, actionRef{
+					resActTrig.actionRefs = append(resActTrig.actionRefs, actionRef{
 						configRef:   action,
 						actionNode:  actionNode,
 						blockIndex:  blockIdx,
 						actionIndex: actionIdx,
 					})
 				}
-				abstract.actionTriggers = append(abstract.actionTriggers, triggerRef)
+				abstract.actionTriggers = append(abstract.actionTriggers, resActTrig)
 			}
 		}
 		if diags.HasErrors() {

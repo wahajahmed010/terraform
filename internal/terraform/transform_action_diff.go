@@ -19,7 +19,6 @@ type ActionDiffTransformer struct {
 }
 
 func (t *ActionDiffTransformer) Transform(g *Graph) error {
-	// FIXME: remove dependency on hard-coded node types
 	resourceInstanceNodes := addrs.MakeMap[addrs.AbsResourceInstance, []GraphNodeResourceInstance]()
 	actionConfigNodes := addrs.MakeMap[addrs.ConfigAction, *NodeActionConfig]()
 
@@ -89,7 +88,6 @@ func (t *ActionDiffTransformer) Transform(g *Graph) error {
 			}
 
 			// Add nodes for each action invocation
-			// FIXME: missing condition
 			node := &nodeActionInvokeApplyInstance{
 				&actionTriggerApplyInstance{
 					ActionInvocation: ai,

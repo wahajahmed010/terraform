@@ -68,10 +68,6 @@ func (n *nodeActionInvokeExpand) References() []*addrs.Reference {
 }
 
 func (n *nodeActionInvokeExpand) DynamicExpand(ctx EvalContext) (*Graph, tfdiags.Diagnostics) {
-	if n.ActionConfig == nil {
-		panic("FIXME: we shouldn't have gotten here")
-	}
-
 	var g Graph
 
 	// the nodeActionInvokeExpand is only here to expand within any targeted
@@ -140,8 +136,7 @@ func (n *nodeActionPlanInvoke) planAction(ctx EvalContext, config *configs.Actio
 		Addr:          addr,
 		ActionTrigger: new(plans.InvokeActionTrigger),
 		ProviderAddr:  n.ProviderAddr,
-		// FIXME: are we validating that ephemerals are not allowed here?
-		ConfigValue: ephemeral.RemoveEphemeralValues(configVal),
+		ConfigValue:   ephemeral.RemoveEphemeralValues(configVal),
 	}
 
 	provider, _, err := getProvider(ctx, n.ProviderAddr)
